@@ -22,7 +22,7 @@ terraform {
 }
 
 provider "relyt" {
-  auth_key = "9a3727e5b9c0ddabaGbll2HVLVKLLY1AyjOilAqeyPOBAb74A7VlJRAdTi0bJWJd3"
+  auth_key = "9a3727e5b9c0mockaGbll2HVLVKLLY1AyjOilAqeyPOBAb74A7VlMOCKTi0bJWJd3"
   role     = "SYSTEMADMIN"
 }
 ```

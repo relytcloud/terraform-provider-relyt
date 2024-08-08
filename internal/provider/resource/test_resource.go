@@ -1,4 +1,4 @@
-package provider
+package resource
 
 import (
 	"context"
@@ -129,20 +129,20 @@ func (r *testResource) Create(ctx context.Context, req resource.CreateRequest, r
 	}
 }
 
-var (
-	model = client.DwsuModel{Endpoints: []client.Endpoints{
-		{
-			Extensions: &map[string]string{"abc": "def"},
-			Host:       "abc",
-			ID:         "",
-			Open:       false,
-			Port:       0,
-			Protocol:   "",
-			Type:       "",
-			URI:        "",
-		}},
-	}
-)
+//var (
+//	model = client.DwsuModel{Endpoints: []client.Endpoints{
+//		{
+//			Extensions: &map[string]string{"abc": "def"},
+//			Host:       "abc",
+//			ID:         "",
+//			Open:       false,
+//			Port:       0,
+//			Protocol:   "",
+//			Type:       "",
+//			URI:        "",
+//		}},
+//	}
+//)
 
 // Read resource information.
 func (r *testResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {

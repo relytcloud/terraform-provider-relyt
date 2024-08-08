@@ -62,7 +62,7 @@ func TestCreateDwsu(t *testing.T) {
 			ID: "beijing-cicd",
 		},
 	}
-	dwsu, err := client.CeateDwsu(ctx, request)
+	dwsu, err := client.CreateDwsu(ctx, request)
 	fmt.Println(fmt.Sprintf("create result:%s resp:%s", strconv.FormatBool(err != nil), dwsu.Msg))
 
 }
@@ -95,7 +95,7 @@ func TestDeleteDwsu(t *testing.T) {
 }
 
 func TestDeleteDps(t *testing.T) {
-	err := client.DropEdps(ctx, client.RegionApi, "4679367072512", "4679367072512-1472-abc")
+	err := client.DropDps(ctx, client.RegionApi, "4679367072512", "4679367072512-1472-abc")
 	if err != nil {
 		fmt.Println(fmt.Sprintf("drop dwsu%s", err.Error()))
 	}
@@ -146,9 +146,11 @@ func TestDropAccount(t *testing.T) {
 }
 
 func TestGetLakeInformation(t *testing.T) {
-	lakeinfo, err := client.GetLakeFormationConfig(ctx, client.RegionApi, "4679482247936", "demo6")
+	//meta, err := client.GetOpenApiMeta(ctx, "ksc", "beijing-cicd")
+	//fmt.Println(meta.URI)
+	lakeinfo, err := client.GetLakeFormationConfig(ctx, client.RegionApi, "4954776226048", "demo6")
 	if err != nil {
-		println("delete account: " + err.Error())
+		println("get account: " + err.Error())
 		return
 	}
 	marshal, err := json.Marshal(lakeinfo)
@@ -166,7 +168,7 @@ func TestDeleteLakeInformation(t *testing.T) {
 }
 
 func TestConfigLakeInformation(t *testing.T) {
-	lakeinfo, err := client.LakeFormationConfig(ctx, client.RegionApi, "4679482247936", "demo6", LakeFormation{
+	lakeinfo, err := client.LakeFormationConfig(ctx, client.RegionApi, "4954776226048", "demo6", LakeFormation{
 		IAMRole: "ttttt3",
 	})
 	if err != nil {
@@ -231,7 +233,7 @@ func TestGetOpenApiMeta(t *testing.T) {
 
 func TestGetDwsu(t *testing.T) {
 
-	mode, err := client.GetDwsu(ctx, "4679438371328")
+	mode, err := client.GetDwsu(ctx, "4679805844736")
 	if err != nil {
 		fmt.Println(fmt.Sprintf("get dwsu%s", err.Error()))
 	}
@@ -262,7 +264,7 @@ func TestGetDwsuServiceAccount(t *testing.T) {
 }
 
 func TestGetDwsuApiMeta(t *testing.T) {
-	mode, err := client.GetDwsuOpenApiMeta(ctx, "4677306879744")
+	mode, err := client.GetDwsuOpenApiMeta(ctx, "4679805844736")
 	if err != nil {
 		fmt.Println(fmt.Sprintf("get api meta%s", err.Error()))
 	}
@@ -295,4 +297,71 @@ func TestRegion(t *testing.T) {
 	fmt.Println("succ" + valueString.RegionApi)
 
 	//provider.RouteRegionUri(ctx, client, diagnose)
+}
+
+func TestGetPrivateLinkService(t *testing.T) {
+	mode, err := client.GetPrivateLinkService(ctx, client.RegionApi, "4679805844736", "data_api")
+	//mode, err := client.GetPrivateLinkService(ctx, client.RegionApi, "4679805844736", "database")
+	if err != nil {
+		fmt.Println(fmt.Sprintf("get privatelink error %s", err.Error()))
+	}
+	marshal, err := json.Marshal(mode)
+	if err != nil {
+		fmt.Println(fmt.Sprintf("err get %s", err.Error()))
+		return
+	}
+	fmt.Println(fmt.Sprintf("get privatelink %s", string(marshal)))
+}
+
+func TestCreatePrivateLinkService(t *testing.T) {
+	service := PrivateLinkService{
+		AllowPrinciples: nil,
+		ServiceName:     "",
+		//ServiceType:     "data_api",
+		ServiceType: "database",
+		Status:      "",
+	}
+	mode, err := client.CreatePrivateLinkService(ctx, client.RegionApi, "4679805844736", service)
+	if err != nil {
+		fmt.Println(fmt.Sprintf("create privatelink error %s", err.Error()))
+	}
+	marshal, err := json.Marshal(mode)
+	if err != nil {
+		fmt.Println(fmt.Sprintf("err get %s", err.Error()))
+		return
+	}
+	fmt.Println(fmt.Sprintf("create privatelink %s", string(marshal)))
+}
+
+func TestPatchPrivateLinkService(t *testing.T) {
+	service := PrivateLinkService{
+		AllowPrinciples: &[]string{"*"},
+		ServiceName:     "",
+		ServiceType:     "data_api",
+		Status:          "",
+	}
+	mode, err := client.PatchPrivateLinkService(ctx, client.RegionApi, "4679805844736", "data_api", service)
+	if err != nil {
+		fmt.Println(fmt.Sprintf("patch privatelink error %s", err.Error()))
+	}
+	marshal, err := json.Marshal(mode)
+	if err != nil {
+		fmt.Println(fmt.Sprintf("err patch %s", err.Error()))
+		return
+	}
+	fmt.Println(fmt.Sprintf("patch privatelink %s", string(marshal)))
+}
+
+func TestDeletePrivateLinkService(t *testing.T) {
+	//mode, err := client.DeletePrivateLinkService(ctx, client.RegionApi, "4679805844736", "data_api")
+	mode, err := client.DeletePrivateLinkService(ctx, client.RegionApi, "4679805844736", "data_api")
+	if err != nil {
+		fmt.Println(fmt.Sprintf("delete privatelink error %s", err.Error()))
+	}
+	marshal, err := json.Marshal(mode)
+	if err != nil {
+		fmt.Println(fmt.Sprintf("err get %s", err.Error()))
+		return
+	}
+	fmt.Println(fmt.Sprintf("delete privatelink %s", string(marshal)))
 }

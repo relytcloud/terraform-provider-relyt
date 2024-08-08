@@ -1,4 +1,4 @@
-package provider
+package resource
 
 import (
 	"context"
@@ -6,9 +6,13 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"terraform-provider-relyt/internal/provider/client"
+	"terraform-provider-relyt/internal/provider/common"
+	"terraform-provider-relyt/internal/provider/model"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -40,7 +44,7 @@ func (r *dpsResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 		Attributes: map[string]schema.Attribute{
 			"dwsu_id":     schema.StringAttribute{Required: true, Description: "The ID of the service unit."},
 			"name":        schema.StringAttribute{Required: true, Description: "The name of the DPS cluster."},
-			"id":          schema.StringAttribute{Computed: true, Description: "The ID of the DPS cluster."},
+			"id":          schema.StringAttribute{Computed: true, Description: "The ID of the DPS cluster.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
 			"description": schema.StringAttribute{Optional: true, Description: "The description of the DPS cluster."},
 			"engine":      schema.StringAttribute{Required: true, Description: "The type of the DPS cluster. enum:{extreme}"},
 			"size":        schema.StringAttribute{Required: true, Description: "The name of the DPS cluster specification."},
@@ -53,13 +57,13 @@ func (r *dpsResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *
 // Create a new resource.
 func (r *dpsResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	// Retrieve values from dpsModel
-	var dpsModel DpsModel
+	var dpsModel model.DpsModel
 	diags := req.Plan.Get(ctx, &dpsModel)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	meta := RouteRegionUri(ctx, dpsModel.DwsuId.ValueString(), r.client, &resp.Diagnostics)
+	meta := common.RouteRegionUri(ctx, dpsModel.DwsuId.ValueString(), r.client, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -74,7 +78,7 @@ func (r *dpsResource) Create(ctx context.Context, req resource.CreateRequest, re
 	}
 	if dpsModel.ID.IsUnknown() {
 		// Create new dps
-		createResult, err := r.client.CreateEdps(ctx, regionUri, dpsModel.DwsuId.ValueString(), relytDps)
+		createResult, err := r.client.CreateDps(ctx, regionUri, dpsModel.DwsuId.ValueString(), relytDps)
 		if err != nil || createResult.Code != 200 {
 			resp.Diagnostics.AddError(
 				"Error creating dps",
@@ -97,24 +101,9 @@ func (r *dpsResource) Create(ctx context.Context, req resource.CreateRequest, re
 			return
 		}
 	}
-	queryDpsMode, err := r.client.TimeOutTask(r.client.CheckTimeOut, r.client.CheckInterval, func() (any, error) {
-		dps, err2 := r.client.GetDps(ctx, regionUri, dpsModel.DwsuId.ValueString(), dpsModel.ID.ValueString())
-		if err2 != nil {
-			//这里判断是否要充实
-			return dps, err2
-		}
-		if dps != nil && dps.Status == client.DPS_STATUS_READY {
-			return dps, nil
-		}
-		return dps, fmt.Errorf("dps is not Ready")
-	})
-	if err != nil {
-		tflog.Error(ctx, "error wait dps ready"+err.Error())
-		resp.Diagnostics.AddError(
-			"create dps failed!", "error wait dps ready! "+err.Error(),
-		)
+	queryDpsMode, _ := WaitDpsReady(ctx, r.client, regionUri, dpsModel.DwsuId.ValueString(), dpsModel.ID.ValueString(), resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
 		return
-		//fmt.Println(fmt.Sprintf("drop dwsu%s", err.Error()))
 	}
 	relytQueryModel := queryDpsMode.(*client.DpsMode)
 	tflog.Info(ctx, "bizId:"+relytQueryModel.ID)
@@ -138,13 +127,13 @@ func (r *dpsResource) Create(ctx context.Context, req resource.CreateRequest, re
 // Read resource information.
 func (r *dpsResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	// Get current state
-	var state DpsModel
+	var state model.DpsModel
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	meta := RouteRegionUri(ctx, state.DwsuId.ValueString(), r.client, &resp.Diagnostics)
+	meta := common.RouteRegionUri(ctx, state.DwsuId.ValueString(), r.client, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -168,28 +157,37 @@ func (r *dpsResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 
 // Update updates the resource and sets the updated Terraform state on success.
 func (r *dpsResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	resp.Diagnostics.AddError("not support", "update dps not supported! please rollback your change!")
+	var plan = model.DpsModel{}
+	req.Plan.Get(ctx, &plan)
+	var state = model.DpsModel{}
+	req.State.Get(ctx, &state)
+	updateDps(ctx, r.client, &state, &plan, resp.Diagnostics, state.DwsuId.ValueString(), state.ID.ValueString())
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	//设置size
+	state.Size = plan.Size
+	resp.State.Set(ctx, &state)
 	return
 }
 
 // Delete deletes the resource and removes the Terraform state on success.
 func (r *dpsResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	// Retrieve values from state
-	var state DpsModel
+	var state model.DpsModel
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	meta := RouteRegionUri(ctx, state.DwsuId.ValueString(), r.client, &resp.Diagnostics)
+	meta := common.RouteRegionUri(ctx, state.DwsuId.ValueString(), r.client, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 	regionUri := meta.URI
 
-	// fixme 这里只要我删除，再读立刻为null了。。这样无法等待edps删除完成
-	err := r.client.DropEdps(ctx, regionUri, state.DwsuId.ValueString(), state.ID.ValueString())
+	err := r.client.DropDps(ctx, regionUri, state.DwsuId.ValueString(), state.ID.ValueString())
 	if err != nil {
 		tflog.Error(ctx, "error delete dps "+err.Error())
 		resp.Diagnostics.AddError(
@@ -198,7 +196,7 @@ func (r *dpsResource) Delete(ctx context.Context, req resource.DeleteRequest, re
 		)
 		return
 	}
-	_, err = r.client.TimeOutTask(r.client.CheckTimeOut, r.client.CheckInterval, func() (any, error) {
+	_, err = common.TimeOutTask(r.client.CheckTimeOut, r.client.CheckInterval, func() (any, error) {
 		dps, err2 := r.client.GetDps(ctx, regionUri, state.DwsuId.ValueString(), state.ID.ValueString())
 		if err2 != nil {
 			//这里判断是否要重试

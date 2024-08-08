@@ -60,6 +60,8 @@ Required:
 Optional:
 
 - `description` (String) The description of the DPS cluster.
+- `dwsu_id` (String) The ID of the service unit.
+- `id` (String) The ID of the DPS cluster.
 
 
 <a id="nestedatt--endpoints"></a>

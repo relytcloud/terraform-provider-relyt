@@ -1,4 +1,4 @@
-package provider
+package datasource
 
 import (
 	"context"
@@ -7,6 +7,8 @@ import (
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"terraform-provider-relyt/internal/provider/client"
+	"terraform-provider-relyt/internal/provider/common"
+	"terraform-provider-relyt/internal/provider/model"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -65,7 +67,7 @@ func (d *serviceAccountDataSource) Schema(_ context.Context, _ datasource.Schema
 
 // Read refreshes the Terraform state with the latest data.
 func (d *serviceAccountDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	var state ServiceAccountModel
+	var state model.ServiceAccountModel
 	diags := req.Config.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -75,7 +77,7 @@ func (d *serviceAccountDataSource) Read(ctx context.Context, req datasource.Read
 		resp.Diagnostics.AddError("dwsu id is nil", "can't query service account with nil dwsu id")
 		return
 	}
-	meta := RouteRegionUri(ctx, state.DwsuId.ValueString(), d.client, &resp.Diagnostics)
+	meta := common.RouteRegionUri(ctx, state.DwsuId.ValueString(), d.client, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -86,11 +88,11 @@ func (d *serviceAccountDataSource) Read(ctx context.Context, req datasource.Read
 		return
 	}
 	if len(account) > 0 {
-		var saList []ServiceAccountInfo
+		var saList []model.ServiceAccountInfo
 		for _, serviceAccount := range account {
 			mapAttr, diagnostics := types.MapValueFrom(ctx, types.StringType, serviceAccount.AccountInfo)
 			resp.Diagnostics.Append(diagnostics...)
-			saList = append(saList, ServiceAccountInfo{
+			saList = append(saList, model.ServiceAccountInfo{
 				Type:        types.StringValue(serviceAccount.Type),
 				AccountInfo: mapAttr,
 			})

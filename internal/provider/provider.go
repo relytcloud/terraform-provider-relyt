@@ -17,6 +17,9 @@ import (
 	"os"
 	"strconv"
 	"terraform-provider-relyt/internal/provider/client"
+	relytDS "terraform-provider-relyt/internal/provider/datasource"
+	"terraform-provider-relyt/internal/provider/model"
+	relytRS "terraform-provider-relyt/internal/provider/resource"
 )
 
 // Ensure RelytProvider satisfies various provider interfaces.
@@ -98,7 +101,7 @@ func (p *RelytProvider) Schema(ctx context.Context, req provider.SchemaRequest, 
 // 读取配置文件
 func (p *RelytProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
 
-	var data RelytProviderModel
+	var data model.RelytProviderModel
 
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 
@@ -206,9 +209,10 @@ func (p *RelytProvider) Configure(ctx context.Context, req provider.ConfigureReq
 
 func (p *RelytProvider) Resources(ctx context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
-		NewdwUserResource,
-		NewDpsResource,
-		NewDwsuResource,
+		relytRS.NewdwUserResource,
+		relytRS.NewDpsResource,
+		relytRS.NewDwsuResource,
+		relytRS.NewPrivateLinkResource,
 		//NewTestResource,
 	}
 }
@@ -216,8 +220,8 @@ func (p *RelytProvider) Resources(ctx context.Context) []func() resource.Resourc
 func (p *RelytProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
 	tflog.Info(ctx, "===== datasource get ")
 	return []func() datasource.DataSource{
-		NewServiceAccountDataSource,
-		NewBoto3DataSource,
+		relytDS.NewServiceAccountDataSource,
+		relytDS.NewBoto3DataSource,
 	}
 }
 

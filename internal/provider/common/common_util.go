@@ -1,7 +1,8 @@
-package provider
+package common
 
 import (
 	"context"
+	"fmt"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"math"
@@ -12,7 +13,7 @@ import (
 
 func RouteRegionUri(ctx context.Context, dwsuId string, relytClient *client.RelytClient,
 	diag *diag.Diagnostics) *client.OpenApiMetaInfo {
-	meta, err := RetryFunction[client.OpenApiMetaInfo](ctx, 5, 1, 1.0,
+	meta, err := CommonRetry[client.OpenApiMetaInfo](ctx,
 		func() (*client.OpenApiMetaInfo, error) {
 			return relytClient.GetDwsuOpenApiMeta(ctx, dwsuId)
 		})
@@ -44,4 +45,40 @@ func RetryFunction[T any](ctx context.Context, retryNum, intervalSecond int,
 	}
 
 	return result, err
+}
+
+func CommonRetry[T any](ctx context.Context, retryableFunc func() (*T, error)) (*T, error) {
+	return RetryFunction(ctx, 5, 1, 1.0, retryableFunc)
+}
+
+func TimeOutTask(timeoutSec int64, checkIntervalSec int32, task func() (any, error)) (any, error) {
+	// 设置超时时间
+	timeout := time.Duration(timeoutSec) * time.Second
+	interval := time.Duration(checkIntervalSec) * time.Second
+
+	// 创建带有超时的上下文
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	//// 启动任务
+	//done := make(chan bool)
+	//f := func() (any, error) {
+	//
+	//}
+	//go f
+	for {
+		select {
+		case <-ctx.Done():
+			fmt.Println("Task timed out")
+			//done <- false
+			return nil, fmt.Errorf("timeout")
+		default:
+			a, err := task()
+			if err == nil {
+				//done <- true
+				return a, err
+			}
+			time.Sleep(interval)
+		}
+	}
 }

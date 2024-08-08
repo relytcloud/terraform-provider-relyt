@@ -37,3 +37,4 @@ website/vendor
 examples/relyt/
 env/
 gpg
+terraform-provider-relyt
