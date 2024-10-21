@@ -38,5 +38,3 @@ examples/relyt/
 env/
 gpg
 terraform-provider-relyt
-
-go.sum
