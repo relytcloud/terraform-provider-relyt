@@ -34,3 +34,10 @@ module "privatelink" {
   source = "./relyt_privatelink"
   dwsu_id = module.dwsu.dwsu_id
 }
+
+module "database_schema" {
+  source = "./relyt_dwsu_database_schema"
+  endpoint = "your privatelink endpoint"
+  access_key = data.relyt_dwsu_boto3_access_info.boto3.boto3_access_infos[0].access_key
+  secret_key = data.relyt_dwsu_boto3_access_info.boto3.boto3_access_infos[0].secret_key
+}

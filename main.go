@@ -54,6 +54,7 @@ func main() {
 	}
 
 	err := providerserver.Serve(context.Background(), provider.New(version), opts)
+	//err = providerserver.Serve(context.Background(), provider.NewDataBaseProvider(version), opts)
 
 	if err != nil {
 		log.Fatal(err.Error())

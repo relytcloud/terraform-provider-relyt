@@ -25,6 +25,7 @@ import (
 // Ensure RelytProvider satisfies various provider interfaces.
 var _ provider.Provider = &RelytProvider{}
 var _ provider.ProviderWithFunctions = &RelytProvider{}
+var _ provider.ProviderWithMetaSchema = &RelytProvider{}
 
 // RelytProvider defines the provider implementation.
 type RelytProvider struct {
@@ -63,6 +64,23 @@ func (p *RelytProvider) Metadata(ctx context.Context, req provider.MetadataReque
 	resp.Version = p.version
 }
 
+func (p *RelytProvider) MetaSchema(ctx context.Context, request provider.MetaSchemaRequest, response *provider.MetaSchemaResponse) {
+	//response.Schema = metaschema.Schema{
+	//	Attributes: map[string]metaschema.Attribute{
+	//		"data_access_config": schema.SingleNestedAttribute{
+	//			Optional:    true,
+	//			Description: "data_access_configs",
+	//			Attributes: map[string]schema.Attribute{
+	//				"access_key":     schema.StringAttribute{Required: true, Description: "access Key"},
+	//				"secret_key":     schema.StringAttribute{Required: true, Description: "secret Key"},
+	//				"endpoint":       schema.StringAttribute{Required: true, Description: "data access endpoint"},
+	//				"client_timeout": schema.Int32Attribute{Optional: true, Description: "client timeout seconds! default 10s"},
+	//			},
+	//		},
+	//	},
+	//}
+}
+
 // 定义provider能接受的参数，类型，是否可选等
 func (p *RelytProvider) Schema(ctx context.Context, req provider.SchemaRequest, resp *provider.SchemaResponse) {
 	tflog.Info(ctx, "===== scheme get ")
@@ -93,6 +111,20 @@ func (p *RelytProvider) Schema(ctx context.Context, req provider.SchemaRequest, 
 			"resource_check_interval": schema.Int64Attribute{
 				Optional:    true,
 				Description: "Interval second used in wait for cycle check! Defaults 5",
+			},
+			"client_timeout": schema.Int64Attribute{
+				Optional:    true,
+				Description: "http client timeout seconds! Defaults 10",
+			},
+			"data_access_config": schema.SingleNestedAttribute{
+				Optional:    true,
+				Description: "data_access_configs",
+				Attributes: map[string]schema.Attribute{
+					"access_key":     schema.StringAttribute{Required: true, Description: "The access key for Open API operations."},
+					"secret_key":     schema.StringAttribute{Required: true, Description: "The secret key for Open API operations."},
+					"endpoint":       schema.StringAttribute{Required: true, Description: "The VPC endpoint for the private link, which must be in the http://<dns_name>:8180 format. Replace <dns_name> with the DNS name of the VPC endpoint you have obtained from Amazon VPC."},
+					"client_timeout": schema.Int32Attribute{Optional: true, Description: "The data access client timeout seconds!"},
+				},
 			},
 		},
 	}
@@ -161,6 +193,7 @@ func (p *RelytProvider) Configure(ctx context.Context, req provider.ConfigureReq
 	}
 	resourceWaitTimeout := int64(1800)
 	checkInterval := int32(5)
+	clientTimeout := int32(10)
 	if !data.ResourceCheckTimeout.IsNull() {
 		tflog.Info(ctx, "resource check wait isn't null! set value:"+strconv.FormatInt(data.ResourceCheckTimeout.ValueInt64(), 10))
 		resourceWaitTimeout = data.ResourceCheckTimeout.ValueInt64()
@@ -175,6 +208,13 @@ func (p *RelytProvider) Configure(ctx context.Context, req provider.ConfigureReq
 		}
 		checkInterval = int32(data.ResourceCheckInterval.ValueInt64())
 	}
+	if !data.ClientTimeout.IsNull() {
+		tflog.Info(ctx, "client timeout isn't null! set value:"+strconv.FormatInt(data.ClientTimeout.ValueInt64(), 10))
+		if data.ClientTimeout.ValueInt64() <= 1 || data.ClientTimeout.ValueInt64() >= math.MaxInt32 {
+			resp.Diagnostics.AddAttributeError(path.Root("client_timeout"), "invalid value", "should be grater than 1")
+		}
+		clientTimeout = int32(data.ClientTimeout.ValueInt64())
+	}
 
 	if resp.Diagnostics.HasError() {
 		return
@@ -186,13 +226,44 @@ func (p *RelytProvider) Configure(ctx context.Context, req provider.ConfigureReq
 	tflog.Info(ctx, fmt.Sprintf(" host: %s auth: %s, role: %s  check timeout: %d interval: %d",
 		apiHost, authKey, data.Role.ValueString(), resourceWaitTimeout, checkInterval))
 	roleId := data.Role.ValueString()
-	relytClient, err := client.NewRelytClient(client.RelytClientConfig{
+	clientConfig := client.RelytClientConfig{
 		ApiHost:       apiHost,
 		AuthKey:       authKey,
 		Role:          roleId,
 		CheckTimeOut:  resourceWaitTimeout,
 		CheckInterval: checkInterval,
-	})
+		ClientTimeout: clientTimeout,
+	}
+	if data.DataAccessConfig != nil {
+		clientConfig.RelytDatabaseClientConfig = &client.RelytDatabaseClientConfig{
+			DmsHost:       data.DataAccessConfig.Endpoint.ValueString(),
+			AccessKey:     data.DataAccessConfig.AccessKey.ValueString(),
+			SecretKey:     data.DataAccessConfig.SecretKey.ValueString(),
+			ClientTimeout: 60,
+		}
+		if clientConfig.RelytDatabaseClientConfig.AccessKey == "" {
+			resp.Diagnostics.AddError("data_access_config error", "access_key can't be empty string")
+		}
+		if clientConfig.RelytDatabaseClientConfig.SecretKey == "" {
+			resp.Diagnostics.AddError("data_access_config error", "secret_key can't be empty string")
+		}
+		if clientConfig.RelytDatabaseClientConfig.DmsHost == "" {
+			resp.Diagnostics.AddError("data_access_config error", "endpoint can't be empty string")
+		}
+
+		if !data.DataAccessConfig.ClientTimeout.IsNull() {
+			dataAccessClientTimeOut := data.DataAccessConfig.ClientTimeout.ValueInt32()
+			if dataAccessClientTimeOut <= 0 {
+				resp.Diagnostics.AddError("wrong data_access_config config!", " client_timeout must greater than 0")
+				return
+			}
+			clientConfig.RelytDatabaseClientConfig.ClientTimeout = dataAccessClientTimeOut
+		}
+		if resp.Diagnostics.HasError() {
+			return
+		}
+	}
+	relytClient, err := client.NewRelytClient(clientConfig)
 	//relytClient.RelytClientConfig.RegionApi = data.RegionApi.ValueString()
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -214,6 +285,8 @@ func (p *RelytProvider) Resources(ctx context.Context) []func() resource.Resourc
 		relytRS.NewDwsuResource,
 		relytRS.NewPrivateLinkResource,
 		relytRS.NewDwsuIntegrationInfoResource,
+		relytRS.NewDwsuDatabaseResource,
+		relytRS.NewDwsuExternalSchemaResource,
 		//relytRS.NewTestResource,
 	}
 }
@@ -223,6 +296,10 @@ func (p *RelytProvider) DataSources(ctx context.Context) []func() datasource.Dat
 	return []func() datasource.DataSource{
 		//relytDS.NewServiceAccountDataSource,
 		relytDS.NewBoto3DataSource,
+		relytDS.NewDwsuDatabasesDataSource,
+		relytDS.NewDwsuDatabaseDetailDataSource,
+		relytDS.NewDwsuSchemasDataSource,
+		relytDS.NewDwsuSchemaDetailDataSource,
 	}
 }
 

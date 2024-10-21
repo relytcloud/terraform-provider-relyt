@@ -18,6 +18,13 @@ type CommonRelytResponse[T any] struct {
 	Data *T     `json:"data,omitempty"`
 }
 
+type CommonPage[T any] struct {
+	PageNumber int  `json:"pageNumber,omitempty"`
+	PageSize   int  `json:"pageSize,omitempty"`
+	Records    []*T `json:"records,omitempty"`
+	Total      int  `json:"total,omitempty"`
+}
+
 type Creator struct {
 	CreateTimestamp int64  `json:"createTimestamp,omitempty"`
 	Domain          string `json:"domain,omitempty"`
@@ -133,12 +140,6 @@ type DwsuModel struct {
 	UpdateTimestamp int64       `json:"updateTimestamp,omitempty"`
 	Variant         *Variant    `json:"variant,omitempty"`
 }
-type CommonPage[T any] struct {
-	PageNumber int  `json:"pageNumber,omitempty"`
-	PageSize   int  `json:"pageSize,omitempty"`
-	Records    []*T `json:"records,omitempty"`
-	Total      int  `json:"total,omitempty"`
-}
 
 type LakeFormation struct {
 	IAMRole string `json:"iamRole,omitempty"`
@@ -186,4 +187,64 @@ type IntegrationInfo struct {
 	ExternalId     string `json:"externalId,omitempty"`
 	RelytPrincipal string `json:"relytPrincipal,omitempty"`
 	RelytVpc       string `json:"relytVpc,omitempty"`
+}
+
+// database
+type Database struct {
+	Name         *string `json:"name,omitempty"`
+	Owner        *string `json:"owner,omitempty"`
+	Comments     *string `json:"comments,omitempty"`
+	Type         *string `json:"type,omitempty"`
+	Hint         *string `json:"hint,omitempty"`
+	Oid          *int    `json:"oid,omitempty"`
+	Collate      *string `json:"collate,omitempty"`
+	Size         *int    `json:"size,omitempty"`
+	PrettySize   *string `json:"prettySize,omitempty"`
+	CreateSchema *bool   `json:"createSchema,omitempty"`
+	UID          *string `json:"uid,omitempty"`
+	Ctype        *string `json:"ctype,omitempty"`
+}
+
+type PageQuery struct {
+	PageSize   int `json:"pageSize"`
+	PageNumber int `json:"pageNumber"`
+}
+
+type Schema struct {
+	Database   *string            `json:"database,omitempty"`
+	Catalog    *string            `json:"catalog,omitempty"`
+	Name       *string            `json:"name,omitempty"`
+	Properties map[string]*string `json:"properties,omitempty"`
+
+	TableFormat *string `json:"tableFormat,omitempty"`
+}
+
+//type SchemaProperties struct {
+//	Metastore             string `json:"metastore,omitempty"`
+//	GlueAccessControlMode string `json:"glue.access-control.mode"`
+//	GlueRegion            string `json:"glue.region"`
+//	S3Region              string `json:"s3.region"`
+//}
+
+type SchemaMeta struct {
+	Name         *string `json:"name,omitempty"`
+	Owner        *string `json:"owner,omitempty"`
+	Comments     *string `json:"comments,omitempty"`
+	Type         *string `json:"type,omitempty"`
+	Oid          *int    `json:"oid,omitempty"`
+	Database     *string `json:"database,omitempty"`
+	Catalog      *string `json:"catalog,omitempty"`
+	HasPrivilege *bool   `json:"hasPrivilege,omitempty"`
+	External     *bool   `json:"external,omitempty"`
+	UID          *string `json:"uid,omitempty"`
+}
+
+//type SchemaChildren struct {
+//	Tables int `json:"tables"`
+//	Views  int `json:"views"`
+//}
+
+type SchemaPageQuery struct {
+	PageQuery
+	Database *string `json:"database,omitempty"`
 }

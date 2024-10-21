@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"math"
 	"os"
@@ -106,4 +107,47 @@ func TimeOutTask(timeoutSec int64, checkIntervalSec int32, task func() (any, err
 			time.Sleep(interval)
 		}
 	}
+}
+
+func ParseAccessConfig(ctx context.Context, relytClient *client.RelytClient, meta tfsdk.Config, diag *diag.Diagnostics) *client.RelytDatabaseClient {
+	//config := model.OptionalProviderConfig{}
+	//diags := meta.Get(ctx, &config)
+	//tflog.Info(ctx, "msg"+config.Auth.AccessKey.ValueString())
+	//diag.Append(diags...)
+	if relytClient == nil || relytClient.RelytDatabaseClientConfig == nil {
+		diag.AddError("Missing provider data_access_config", "please supply and  check your data access config!")
+		return nil
+	}
+	databaseClient, err := client.NewRelytDatabaseClient(*relytClient.RelytDatabaseClientConfig)
+	if err != nil {
+		diag.AddError("ProviderMeta parse error", "error parse data access config! "+err.Error())
+	}
+	return &databaseClient
+	//return &config
+}
+
+func ScrollPageRecords[T any](diag *diag.Diagnostics, list func(pageSize, pageNum int) ([]T, error)) ([]T, error) {
+	var records []T
+	pageSize, pageNum := 100, 1
+	for {
+		databases, err := list(pageSize, pageNum)
+		if err != nil {
+			msg := "databases read failed"
+			if err != nil {
+				msg = err.Error()
+			}
+			diag.AddError("Failed list databases", "error list database "+msg)
+			return records, err
+		}
+		now := 0
+		if databases != nil && len(databases) > 0 {
+			records = append(records, databases...)
+			now = len(databases)
+		}
+		pageNum++
+		if now < pageSize {
+			break
+		}
+	}
+	return records, nil
 }

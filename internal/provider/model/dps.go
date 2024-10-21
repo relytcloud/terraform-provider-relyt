@@ -6,11 +6,13 @@ import (
 
 // RelytProviderModel describes the provider data model.
 type RelytProviderModel struct {
-	ApiHost               types.String `tfsdk:"api_host"`
-	AuthKey               types.String `tfsdk:"auth_key"`
-	Role                  types.String `tfsdk:"role"`
-	ResourceCheckTimeout  types.Int64  `tfsdk:"resource_check_timeout"`
-	ResourceCheckInterval types.Int64  `tfsdk:"resource_check_interval"`
+	ApiHost               types.String      `tfsdk:"api_host"`
+	AuthKey               types.String      `tfsdk:"auth_key"`
+	Role                  types.String      `tfsdk:"role"`
+	ResourceCheckTimeout  types.Int64       `tfsdk:"resource_check_timeout"`
+	ResourceCheckInterval types.Int64       `tfsdk:"resource_check_interval"`
+	ClientTimeout         types.Int64  `tfsdk:"client_timeout"`
+	DataAccessConfig      *DataAccessConfig `tfsdk:"data_access_config"`
 }
 type Endpoints struct {
 	Extensions types.Map    `tfsdk:"extensions"`
