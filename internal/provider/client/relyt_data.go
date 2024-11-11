@@ -227,16 +227,18 @@ type Schema struct {
 //}
 
 type SchemaMeta struct {
-	Name         *string `json:"name,omitempty"`
-	Owner        *string `json:"owner,omitempty"`
-	Comments     *string `json:"comments,omitempty"`
-	Type         *string `json:"type,omitempty"`
-	Oid          *int    `json:"oid,omitempty"`
-	Database     *string `json:"database,omitempty"`
-	Catalog      *string `json:"catalog,omitempty"`
-	HasPrivilege *bool   `json:"hasPrivilege,omitempty"`
-	External     *bool   `json:"external,omitempty"`
-	UID          *string `json:"uid,omitempty"`
+	Name         *string             `json:"name,omitempty"`
+	Owner        *string             `json:"owner,omitempty"`
+	Comments     *string             `json:"comments,omitempty"`
+	Type         *string             `json:"type,omitempty"`
+	Oid          *int                `json:"oid,omitempty"`
+	Database     *string             `json:"database,omitempty"`
+	Catalog      *string             `json:"catalog,omitempty"`
+	HasPrivilege *bool               `json:"hasPrivilege,omitempty"`
+	External     *bool               `json:"external,omitempty"`
+	UID          *string             `json:"uid,omitempty"`
+	TableFormat  *string             `json:"tableFormat,omitempty"`
+	Properties   *map[string]*string `json:"properties,omitempty"`
 }
 
 //type SchemaChildren struct {

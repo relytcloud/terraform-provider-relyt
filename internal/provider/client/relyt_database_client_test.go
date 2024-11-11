@@ -10,7 +10,7 @@ import (
 
 func init() {
 	relytDatabaseClientConfig := RelytDatabaseClientConfig{
-		DmsHost:   "http://pl-4679805844736-api-d3410a34c78f4386.elb.us-east-1.amazonaws.com:8180",
+		DmsHost:   "http://127.0.0.1:8180",
 		AccessKey: "AK8DoEFMRPWBGG0eY1JyNBVj7OnrTO3B6t3uJFyibDcGwz56HrAlg8uKtxf9hQeoHphJzOw",
 		SecretKey: "HHJU4NBSLKZVGKTGRM41FCLGZVH4VPWS",
 	}
@@ -35,7 +35,7 @@ func TestRelytDatabaseClient_testSign(t *testing.T) {
 
 func TestRelytDatabaseClient_createDatabase(t *testing.T) {
 	name := "abc"
-	database, err := databaseClient.CreateDatabase(context.TODO(), Database{Name: name, Comments: "abc"})
+	database, err := databaseClient.CreateDatabase(context.TODO(), Database{Name: &name, Comments: &name})
 	if err != nil {
 		fmt.Println("error create" + err.Error())
 		return
@@ -71,12 +71,19 @@ func TestRelytDatabaseClient_listAllDatabase(t *testing.T) {
 }
 
 func TestRelytDatabaseClient_schma(t *testing.T) {
+	database := "ex_db"
+	catalog := "test"
+	name := "tpch"
+	//format := "DELTA"
+	//glue := "glue"
+	//region := "us-east-1"
+	//lake := "lake-formation"
 	schema := Schema{
-		Database:    "abc",
-		Catalog:     "qingdeng",
-		Name:        "schema",
-		Properties:  map[string]string{"metastore.type": "glue", "glue.region": "us-east-1", "s3.region": "us-east-1", "glue.access-control.mode": "lake-formation"},
-		TableFormat: "DELTA",
+		Database: &database,
+		Catalog:  &catalog,
+		Name:     &name,
+		//Properties:  map[string]*string{"metastore.type": &glue, "glue.region": &region, "s3.region": &region, "glue.access-control.mode": &lake},
+		//TableFormat: &format,
 	}
 	//resp, err := databaseClient.createExternalSchema(ctx, schema)
 	//if err != nil {
@@ -97,12 +104,19 @@ func TestRelytDatabaseClient_schma(t *testing.T) {
 }
 
 func TestListSchema(t *testing.T) {
+	database := "abc"
+	catalog := "qingdeng"
+	name := "schema"
+	format := "DELTA"
+	glue := "glue"
+	region := "us-east-1"
+	lake := "lake-formation"
 	schema := Schema{
-		Database:    "exp",
-		Catalog:     "catalog",
-		Name:        "external",
-		Properties:  map[string]string{"metastore.type": "glue", "glue.region": "us-east-1", "s3.region": "us-east-1", "glue.access-control.mode": "lake-formation"},
-		TableFormat: "DELTA",
+		Database:    &database,
+		Catalog:     &catalog,
+		Name:        &name,
+		Properties:  map[string]*string{"metastore.type": &glue, "glue.region": &region, "s3.region": &region, "glue.access-control.mode": &lake},
+		TableFormat: &format,
 	}
 	//	 drop
 	drop, err := databaseClient.DropSchema(ctx, schema)
@@ -118,7 +132,7 @@ func TestListSchema(t *testing.T) {
 			PageSize:   100,
 			PageNumber: 1,
 		},
-		Database: "abc",
+		Database: &database,
 	})
 	if err != nil {
 		fmt.Println("err  " + err.Error())
@@ -126,39 +140,4 @@ func TestListSchema(t *testing.T) {
 	}
 	marshal, _ = json.Marshal(list)
 	fmt.Println("drop: " + string(marshal))
-}
-
-func TestRelytDatabaseClient_testNil(t *testing.T) {
-
-	schemaMeta := SchemaMeta{
-		Name:     "",
-		Owner:    "",
-		Comments: "",
-		Type:     "",
-		Oid:      nil,
-		Database: "",
-		Catalog:  "",
-		UID:      "",
-	}
-	marshal, _ := json.Marshal(schemaMeta)
-	fmt.Println(string(marshal))
-	json.Unmarshal([]byte("{name:\"\"}"), &schemaMeta)
-	fmt.Println("name====" + schemaMeta.Name)
-
-	//json := "{}"
-	type Inner struct {
-		boo bool `json:"boo,omitempty"`
-	}
-	abc := Inner{}
-	json.Unmarshal([]byte("{}"), &abc)
-	var bool1 *bool
-	bool1 = &abc.boo
-	if *bool1 == true {
-		fmt.Println("true")
-	} else {
-		fmt.Println("false")
-	}
-	var ddd []int
-	ddd = nil
-	fmt.Println(len(ddd))
 }

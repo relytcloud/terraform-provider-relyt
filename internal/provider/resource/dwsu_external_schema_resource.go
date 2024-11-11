@@ -2,13 +2,18 @@ package resource
 
 import (
 	"context"
+	"encoding/base64"
+	"fmt"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"strings"
 	"terraform-provider-relyt/internal/provider/client"
 	"terraform-provider-relyt/internal/provider/common"
 	"terraform-provider-relyt/internal/provider/model"
+	"terraform-provider-relyt/internal/provider/resource/modifier"
 )
 
 // Ensure the implementation satisfies the expected interfaces.
@@ -41,7 +46,8 @@ func (r *DwsuExternalSchemaResource) Schema(_ context.Context, _ resource.Schema
 			"name":         schema.StringAttribute{Required: true, Description: "The name of the external schema. The schema name must be consistent with the name of the target schema that exists in the external catalog.\nNote that the combined length of the catalog and schema values must not exceed 127 characters."},
 			"catalog":      schema.StringAttribute{Required: true, Description: "The name of the catalog.\nNote that the combined length of the catalog and schema values must not exceed 127 characters."},
 			"database":     schema.StringAttribute{Required: true, Description: "The name of the database."},
-			"table_format": schema.StringAttribute{Required: true, Description: "table_format"},
+			"table_format": schema.StringAttribute{Required: true, Description: "table_format", PlanModifiers: []planmodifier.String{modifier.GetStringIgnoreCaseModifier()}},
+			//"table_format": schema.StringAttribute{Required: true, Description: "table_format"},
 			"properties": schema.MapAttribute{
 				ElementType: types.StringType,
 				Required:    true,
@@ -109,16 +115,19 @@ func (r *DwsuExternalSchemaResource) Read(ctx context.Context, req resource.Read
 		resp.Diagnostics.AddError("Failed to Read schema", "error to Read schema:"+msg)
 		return
 	}
-	resp.State.Set(ctx, externalSchema)
-	//todo 这里没读取？
-	//if getExternalSchema.pro{
-	//
-	//}
+	if getExternalSchema.Properties == nil {
+		externalSchema.Properties = map[string]*string{}
+	} else {
+		externalSchema.Properties = *getExternalSchema.Properties
+	}
+	externalSchema.TableFormat = types.StringPointerValue(getExternalSchema.TableFormat)
+
+	resp.State.Set(ctx, &externalSchema)
 }
 
 // Update updates the resource and sets the updated Terraform state on success.
 func (r *DwsuExternalSchemaResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	resp.Diagnostics.AddWarning("Not Support！", "schema not support update! please rollback your change")
+	resp.Diagnostics.AddError("Not Support！", "schema not support update! please rollback your change")
 }
 
 // Delete deletes the resource and removes the Terraform state on success.
@@ -165,5 +174,45 @@ func (r *DwsuExternalSchemaResource) Delete(ctx context.Context, req resource.De
 
 func (r *DwsuExternalSchemaResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	// Retrieve import ID and save to id attribute
-	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+	//resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+
+	// Retrieve import ID and save to id attribute
+	idParts := strings.Split(req.ID, ",")
+	if !(len(idParts) == 3 || len(idParts) == 4) {
+		resp.Diagnostics.AddError(
+			"Unexpected Import Identifier",
+			fmt.Sprintf("Expected import identifier with format: database,catalog,name or base64,endcode_database,encode_catalog,encode_name. Got: %q", req.ID),
+		)
+		return
+	}
+	if len(idParts) == 4 && "base64" != idParts[0] {
+		resp.Diagnostics.AddError(
+			"Unexpected Import Identifier",
+			fmt.Sprintf("base64 formate ID must start with base64. Got: %q", req.ID),
+		)
+		return
+	}
+	ids := []string{idParts[0], idParts[1], idParts[2]}
+	if len(idParts) == 4 {
+		//base64解码
+		for i := 0; i < 3; i++ {
+			encodedStr := idParts[i+1]
+			decodedBytes, err := base64.StdEncoding.DecodeString(encodedStr)
+			if err != nil {
+				resp.Diagnostics.AddError(
+					"Unexpected Import Identifier",
+					fmt.Sprintf("base64 format error: %q", encodedStr),
+				)
+				return
+			}
+			ids[i] = string(decodedBytes)
+		}
+	}
+	database := ids[0]
+	catalog := ids[1]
+	name := ids[2]
+
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("database"), database)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("catalog"), catalog)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("name"), name)...)
 }

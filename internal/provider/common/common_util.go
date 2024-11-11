@@ -118,6 +118,19 @@ func ParseAccessConfig(ctx context.Context, relytClient *client.RelytClient, met
 		diag.AddError("Missing provider data_access_config", "please supply and  check your data access config!")
 		return nil
 	}
+	if relytClient.RelytDatabaseClientConfig.AccessKey == "" {
+		diag.AddError("data_access_config error", "access_key can't be empty string")
+	}
+	if relytClient.RelytDatabaseClientConfig.SecretKey == "" {
+		diag.AddError("data_access_config error", "secret_key can't be empty string")
+	}
+	if relytClient.RelytDatabaseClientConfig.DmsHost == "" {
+		diag.AddError("data_access_config error", "endpoint can't be empty string")
+	}
+	if diag.HasError() {
+		return nil
+	}
+
 	databaseClient, err := client.NewRelytDatabaseClient(*relytClient.RelytDatabaseClientConfig)
 	if err != nil {
 		diag.AddError("ProviderMeta parse error", "error parse data access config! "+err.Error())
