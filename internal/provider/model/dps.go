@@ -11,7 +11,7 @@ type RelytProviderModel struct {
 	Role                  types.String      `tfsdk:"role"`
 	ResourceCheckTimeout  types.Int64       `tfsdk:"resource_check_timeout"`
 	ResourceCheckInterval types.Int64       `tfsdk:"resource_check_interval"`
-	ClientTimeout         types.Int64  `tfsdk:"client_timeout"`
+	ClientTimeout         types.Int64       `tfsdk:"client_timeout"`
 	DataAccessConfig      *DataAccessConfig `tfsdk:"data_access_config"`
 }
 type Endpoints struct {
@@ -33,19 +33,23 @@ type Dps struct {
 	Status      types.String `tfsdk:"status"`
 }
 
-type DwsuModel struct {
-	ID         types.String `tfsdk:"id"`
-	Alias      types.String `tfsdk:"alias"`
-	Cloud      types.String `tfsdk:"cloud"`
-	Region     types.String `tfsdk:"region"`
-	Variant    types.String `tfsdk:"variant"`
-	Edition    types.String `tfsdk:"edition"`
-	Domain     types.String `tfsdk:"domain"`
-	DefaultDps *Dps         `tfsdk:"default_dps"`
+type PlainDwsuModel struct {
+	ID      types.String `tfsdk:"id"`
+	Alias   types.String `tfsdk:"alias"`
+	Cloud   types.String `tfsdk:"cloud"`
+	Region  types.String `tfsdk:"region"`
+	Variant types.String `tfsdk:"variant"`
+	Edition types.String `tfsdk:"edition"`
+	Domain  types.String `tfsdk:"domain"`
 	//Endpoints  []Endpoints  `tfsdk:"endpoints"`
 	Endpoints types.List `tfsdk:"endpoints"`
 	//LastUpdated types.Int64  `tfsdk:"last_updated"`
 	//Status      types.String `tfsdk:"status"`
+}
+
+type DwsuModel struct {
+	PlainDwsuModel
+	DefaultDps *Dps `tfsdk:"default_dps"`
 }
 
 type DpsModel struct {
@@ -70,4 +74,14 @@ type DWUserModel struct {
 	AsyncQueryResultLocationAwsRoleArn types.String `tfsdk:"async_query_result_location_aws_role_arn"`
 	//LastUpdated                        types.String `tfsdk:"last_updated"`
 	//Status                             types.String `tfsdk:"status"`
+}
+
+type DwsuListModel struct {
+	DwsuList types.List `tfsdk:"dwsu_list"`
+}
+
+type CloudRegionEndpoints struct {
+	Cloud     types.String `tfsdk:"cloud"`
+	Region    types.String `tfsdk:"region"`
+	Endpoints types.List   `tfsdk:"endpoints"`
 }

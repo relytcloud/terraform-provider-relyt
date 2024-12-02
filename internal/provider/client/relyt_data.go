@@ -250,3 +250,13 @@ type SchemaPageQuery struct {
 	PageQuery
 	Database *string `json:"database,omitempty"`
 }
+
+type RegionEndpoint struct {
+	Host     string `json:"host,omitempty"`
+	ID       string `json:"id,omitempty"`
+	Open     bool   `json:"open,omitempty"`
+	Port     int32  `json:"port,omitempty"`
+	Protocol string `json:"protocol,omitempty"`
+	Type     string `json:"type,omitempty"`
+	URI      string `json:"uri,omitempty"`
+}

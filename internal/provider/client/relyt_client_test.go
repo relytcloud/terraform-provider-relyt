@@ -376,3 +376,25 @@ func TestDeletePrivateLinkService(t *testing.T) {
 	}
 	fmt.Println(fmt.Sprintf("delete privatelink %s", string(marshal)))
 }
+
+func TestRelytClient_GetRegionEndpoints(t *testing.T) {
+	resp, err := client.GetRegionEndpoints(ctx, "aws", "ap-east-1")
+	if err != nil {
+		fmt.Println("err" + err.Error())
+		return
+	}
+	marshal, err := json.Marshal(resp)
+	fmt.Println(string(marshal))
+}
+
+func TestMap(t *testing.T) {
+	mm := map[string]RegionEndpoint{"abc": {ID: "abc"}}
+	abc, _ := json.Marshal(mm)
+	um := map[string]string{}
+	err := json.Unmarshal(abc, &um)
+	if err != nil {
+		fmt.Println("err!", err.Error())
+		return
+	}
+	fmt.Println(um["abc"])
+}

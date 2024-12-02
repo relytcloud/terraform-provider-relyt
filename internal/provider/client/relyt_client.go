@@ -19,7 +19,7 @@ type RelytClientConfig struct {
 	RegionApi                 string                     `json:"regionApi"`
 	CheckTimeOut              int64                      `json:"checkTimeOut"`
 	CheckInterval             int32                      `json:"checkInterval"`
-	ClientTimeout int32  `json:"clientTimeout"`
+	ClientTimeout             int32                      `json:"clientTimeout"`
 	RelytDatabaseClientConfig *RelytDatabaseClientConfig `json:"relytDatabaseClientConfig"`
 }
 
@@ -376,4 +376,15 @@ func (p *RelytClient) PatchIntegration(ctx context.Context, regionUri, dwService
 		return nil, err
 	}
 	return &resp, nil
+}
+
+func (p *RelytClient) GetRegionEndpoints(ctx context.Context, cloud, region string) (*[]RegionEndpoint, error) {
+	path := fmt.Sprintf("/infra/%s/%s/endpoint", url.PathEscape(cloud), url.PathEscape(region))
+	resp := CommonRelytResponse[[]RegionEndpoint]{}
+	err := doHttpRequest(p, ctx, "", path, "GET", &resp, nil, nil, nil)
+	if err != nil {
+		tflog.Error(ctx, "Error list region endpoints:"+err.Error())
+		return nil, err
+	}
+	return resp.Data, nil
 }

@@ -41,3 +41,15 @@ module "database_schema" {
   access_key = data.relyt_dwsu_boto3_access_info.boto3.boto3_access_infos[0].access_key
   secret_key = data.relyt_dwsu_boto3_access_info.boto3.boto3_access_infos[0].secret_key
 }
+
+
+module "cloud_region_endpoint" {
+  source = "./relyt_cloud_region_endpoints"
+  cloud = "aws"
+  region = "ap-east-1"
+}
+
+module "dwsu_list" {
+  source = "./relyt_dwsu_list"
+  alias = "dwsu"
+}

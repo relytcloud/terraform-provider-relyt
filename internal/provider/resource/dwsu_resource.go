@@ -379,24 +379,18 @@ func (r *dwsuResource) mapRelytModelToTerraform(ctx context.Context, diagnostics
 			for _, endpoint := range relytDwsuModel.Endpoints {
 				tfEndpoint := model.Endpoints{
 					//Extensions: types.MapValue(types.StringType),
-					Host:     types.StringValue(endpoint.Host),
-					ID:       types.StringValue(endpoint.ID),
-					Open:     types.BoolValue(endpoint.Open),
-					Port:     types.Int32Value(endpoint.Port),
-					Protocol: types.StringValue(endpoint.Protocol),
-					Type:     types.StringValue(endpoint.Type),
-					URI:      types.StringValue(endpoint.URI),
+					Host:       types.StringValue(endpoint.Host),
+					ID:         types.StringValue(endpoint.ID),
+					Open:       types.BoolValue(endpoint.Open),
+					Port:       types.Int32Value(endpoint.Port),
+					Protocol:   types.StringValue(endpoint.Protocol),
+					Type:       types.StringValue(endpoint.Type),
+					URI:        types.StringValue(endpoint.URI),
+					Extensions: types.MapNull(types.StringType),
 				}
-				if endpoint.Extensions != nil {
-					//tfMap := make(map[string]attr.Value, len(*endpoint.Extensions))
-					//for key, v := range *endpoint.Extensions {
-					//	tfMap[key] = types.StringValue(v)
-					//}
-					//tfEndpoint.Extensions.ElementsAs(ctx, &tfMap, false)
-				}
-				mapValue, diage := types.MapValueFrom(ctx, types.StringType, endpoint.Extensions)
-				diagnostics.Append(diage...)
-				tfEndpoint.Extensions = mapValue
+				//mapValue, diage := types.MapValueFrom(ctx, types.StringType, endpoint.Extensions)
+				//diagnostics.Append(diage...)
+				//tfEndpoint.Extensions = mapValue
 				tfEndPoints = append(tfEndPoints, tfEndpoint)
 				//tfDwsuModel.Endpoints = append(tfDwsuModel.Endpoints, tfEndpoint)
 			}
