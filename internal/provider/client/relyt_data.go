@@ -260,3 +260,9 @@ type RegionEndpoint struct {
 	Type     string `json:"type,omitempty"`
 	URI      string `json:"uri,omitempty"`
 }
+
+type UserSecurityPolicy struct {
+	ExtraMfaProtectionScopes     []string `json:"extraMfaProtectionScopes,omitempty"`
+	MFAStrategy                  string   `json:"mfaStrategy,omitempty"`
+	RequiredChangingInitPassword bool     `json:"requiredChangingInitPassword,omitempty"`
+}

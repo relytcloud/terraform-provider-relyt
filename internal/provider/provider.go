@@ -289,6 +289,7 @@ func (p *RelytProvider) Resources(ctx context.Context) []func() resource.Resourc
 		relytRS.NewDwsuIntegrationInfoResource,
 		relytRS.NewDwsuDatabaseResource,
 		relytRS.NewDwsuExternalSchemaResource,
+		relytRS.NewdwsuUserPolicy,
 		//relytRS.NewTestResource,
 	}
 }

@@ -24,3 +24,10 @@ type Boto3AccessInfo struct {
 	AccessKey   types.String `tfsdk:"access_key"`
 	SecretKey   types.String `tfsdk:"secret_key"`
 }
+
+type DwsuUserSecurityPolicy struct {
+	DwsuId            types.String `tfsdk:"dwsu_id"`
+	MFA               types.String `tfsdk:"mfa"`
+	ResetInitPassword types.Bool   `tfsdk:"reset_init_password"`
+	//MFAProtectionScopes types.Set    `tfsdk:"mfa_protection_scopes"`
+}

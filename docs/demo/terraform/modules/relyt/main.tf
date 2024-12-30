@@ -19,6 +19,11 @@ module "edps" {
   dwsu_id = module.dwsu.dwsu_id
 }
 
+module "dwsu_user_policy" {
+  source = "./relyt_dwsu_user_policy"
+  dwsu_id = module.dwsu.dwsu_id
+}
+
 module "dw_user" {
   source = "./dw_user"
   dwsu_id = module.dwsu.dwsu_id

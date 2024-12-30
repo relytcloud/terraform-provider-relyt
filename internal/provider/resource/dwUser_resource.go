@@ -186,9 +186,6 @@ func (r *dwUserResource) Update(ctx context.Context, req resource.UpdateRequest,
 	if stat.AccountName.ValueString() != plan.AccountName.ValueString() {
 		resp.Diagnostics.AddError("not support", "can't update account name!")
 	}
-	if stat.AccountPassword.ValueString() != plan.AccountPassword.ValueString() {
-		resp.Diagnostics.AddError("not support", "can't update init password!")
-	}
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -199,6 +196,18 @@ func (r *dwUserResource) Update(ctx context.Context, req resource.UpdateRequest,
 		return
 	}
 	regionUri := meta.URI
+
+	if stat.AccountPassword.ValueString() != plan.AccountPassword.ValueString() {
+		//resp.Diagnostics.AddError("not support", "can't update init password!")
+		_, err := common.CommonRetry(ctx, func() (*client.CommonRelytResponse[string], error) {
+			return r.client.PatchAccount(ctx, regionUri, plan.DwsuId.ValueString(), plan.ID.ValueString(), plan.AccountPassword.ValueString())
+		})
+		if err != nil {
+			resp.Diagnostics.AddError("Failed update password", " patch password failed with:"+err.Error())
+			return
+		}
+	}
+
 	tflog.Info(ctx, "accountId:"+plan.ID.ValueString())
 	r.handleAccountConfig(ctx, &plan, regionUri, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
