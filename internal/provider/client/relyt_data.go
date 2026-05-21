@@ -266,3 +266,13 @@ type UserSecurityPolicy struct {
 	MFAStrategy                  string   `json:"mfaStrategy,omitempty"`
 	RequiredChangingInitPassword bool     `json:"requiredChangingInitPassword,omitempty"`
 }
+
+// EntraIdConfig is the request/response body for /api/entraid-config.
+// Note: Enabled has no `omitempty` because `false` must be sent over the wire
+// to soft-disable SSO while retaining tenant/client IDs.
+type EntraIdConfig struct {
+	TenantId   string `json:"tenantId,omitempty"`
+	ClientId   string `json:"clientId,omitempty"`
+	TenantType string `json:"tenantType,omitempty"`
+	Enabled    bool   `json:"enabled"`
+}

@@ -421,3 +421,52 @@ func TestRelytClient_GetUserSecurityPolicy(t *testing.T) {
 	marshal, err = json.Marshal(suc)
 	fmt.Println(string(marshal))
 }
+
+// === Entra ID SSO smoke tests ===
+// Fill in with values from your local test environment before running.
+const (
+	testEntraIdDmsHost = "<https://api-<your-dwsu-domain>>"
+	testEntraIdDwsuId  = "<your-dwsu-id>"
+)
+
+func TestPutEntraIdConfig(t *testing.T) {
+	resp, err := client.PutEntraIdConfig(ctx, testEntraIdDmsHost, testEntraIdDwsuId, EntraIdConfig{
+		TenantId:   "00000000-0000-0000-0000-000000000000",
+		ClientId:   "11111111-1111-1111-1111-111111111111",
+		TenantType: "single",
+		Enabled:    true,
+	})
+	if err != nil {
+		t.Fatalf("put err: %v", err)
+	}
+	fmt.Printf("put resp: %+v\n", resp)
+}
+
+func TestGetEntraIdConfig(t *testing.T) {
+	cfg, err := client.GetEntraIdConfig(ctx, testEntraIdDmsHost, testEntraIdDwsuId)
+	if err != nil {
+		t.Fatalf("get err: %v", err)
+	}
+	fmt.Printf("get resp: %+v\n", cfg)
+}
+
+func TestDeleteEntraIdConfig(t *testing.T) {
+	err := client.DeleteEntraIdConfig(ctx, testEntraIdDmsHost, testEntraIdDwsuId)
+	if err != nil {
+		t.Fatalf("delete err: %v", err)
+	}
+}
+
+func TestEntraIdConfig_NotFoundReadIdempotent(t *testing.T) {
+	// Backend behaviour (confirmed against dev DMS on 2026-05-19): when no config
+	// is present, GET returns HTTP 200 + code:200 + data:null. So GetEntraIdConfig
+	// returns (nil, nil) — no special error code handling is needed.
+	_ = client.DeleteEntraIdConfig(ctx, testEntraIdDmsHost, testEntraIdDwsuId)
+	cfg, err := client.GetEntraIdConfig(ctx, testEntraIdDmsHost, testEntraIdDwsuId)
+	if err != nil {
+		t.Fatalf("expected nil err on missing config, got %v", err)
+	}
+	if cfg != nil {
+		t.Fatalf("expected nil cfg, got %+v", cfg)
+	}
+}

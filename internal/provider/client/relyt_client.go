@@ -421,3 +421,39 @@ func (p *RelytClient) PatchUserSecurityPolicy(ctx context.Context, regionUri, dw
 	}
 	return resp.Data, nil
 }
+
+func (p *RelytClient) GetEntraIdConfig(ctx context.Context, dmsHost, dwsuId string) (*EntraIdConfig, error) {
+	path := "/api/entraid-config"
+	resp := CommonRelytResponse[EntraIdConfig]{}
+	// Backend returns code:200, data:null when the config is absent — no special
+	// not-found code needed. resp.Data == nil signals "not configured" to callers.
+	err := doHttpRequest(p, ctx, dmsHost, path, "GET", &resp, nil, nil, nil)
+	if err != nil {
+		tflog.Error(ctx, "Error get entraid-config: "+err.Error())
+		return nil, err
+	}
+	return resp.Data, nil
+}
+
+func (p *RelytClient) PutEntraIdConfig(ctx context.Context, dmsHost, dwsuId string, cfg EntraIdConfig) (*EntraIdConfig, error) {
+	path := "/api/entraid-config"
+	resp := CommonRelytResponse[EntraIdConfig]{}
+	err := doHttpRequest(p, ctx, dmsHost, path, "PUT", &resp, cfg, nil, nil)
+	if err != nil {
+		tflog.Error(ctx, "Error put entraid-config: "+err.Error())
+		return nil, err
+	}
+	return resp.Data, nil
+}
+
+func (p *RelytClient) DeleteEntraIdConfig(ctx context.Context, dmsHost, dwsuId string) error {
+	path := "/api/entraid-config"
+	resp := CommonRelytResponse[string]{}
+	// Backend returns code:200 success even when the config doesn't exist — DELETE
+	// is already idempotent on the server side, no special handler needed.
+	err := doHttpRequest(p, ctx, dmsHost, path, "DELETE", &resp, nil, nil, nil)
+	if err != nil {
+		tflog.Info(ctx, "delete entraid-config err: "+err.Error())
+	}
+	return err
+}
