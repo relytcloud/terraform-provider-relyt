@@ -139,7 +139,7 @@ terraform {
   required_providers {
     relyt = {
       source  = "relytcloud/relyt"
-      version = ">= 0.0.4"   # 含 entraid_config 资源的最早版本
+      version = ">= 1.5.0"   # 含 entraid_config 资源的最早版本
     }
   }
 }
@@ -449,7 +449,7 @@ terraform {
   required_providers {
     relyt = {
       source  = "relytcloud/relyt"
-      version = ">= 0.0.4"
+      version = ">= 1.5.0"
     }
   }
 }
