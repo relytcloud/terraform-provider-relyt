@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 	"terraform-provider-relyt/internal/provider/client"
 	"time"
@@ -52,19 +53,39 @@ func RouteRegionUri(ctx context.Context, dwsuId string, relytClient *client.Rely
 	return meta
 }
 
-// PickOpenApiURIFromEndpoints returns the URI of the first endpoint whose
-// Type is "openapi". Pure function (no network), unit-testable.
+// PickOpenApiURIFromEndpoints returns the base URI to use for DMS REST API
+// calls (e.g. /api/entraid-config). Resolution order:
+//  1. The first endpoint with Type == "openapi" (the canonical DMS API host).
+//  2. Fallback: the first endpoint with Type == "web_console" — in shared-
+//     frontend deployments the console and API are served by the same host
+//     under a per-DWSU path prefix like /dms/<id>/, so the web_console URI
+//     already includes the prefix that the API calls need.
+//
+// Trailing "/" is stripped so callers can safely concatenate "/api/...".
+// Pure function (no network), unit-testable.
 func PickOpenApiURIFromEndpoints(endpoints []client.Endpoints) (string, error) {
+	var webConsoleURI string
 	for _, ep := range endpoints {
-		if ep.Type == "openapi" && ep.URI != "" {
-			return ep.URI, nil
+		if ep.URI == "" {
+			continue
+		}
+		if ep.Type == "openapi" {
+			return strings.TrimRight(ep.URI, "/"), nil
+		}
+		if ep.Type == "web_console" && webConsoleURI == "" {
+			webConsoleURI = ep.URI
 		}
 	}
-	return "", fmt.Errorf("no endpoint of type 'openapi' found")
+	if webConsoleURI != "" {
+		return strings.TrimRight(webConsoleURI, "/"), nil
+	}
+	return "", fmt.Errorf("no endpoint of type 'openapi' or 'web_console' found")
 }
 
-// RouteDwsuOpenApiHost fetches the DWSU model and returns its openapi endpoint URI.
-// Adds diagnostics on failure (mirrors RouteRegionUri's style).
+// RouteDwsuOpenApiHost fetches the DWSU model and returns a URI suitable for
+// /api/* calls — preferring an explicit "openapi" endpoint and falling back
+// to "web_console" (see PickOpenApiURIFromEndpoints). Adds diagnostics on
+// failure (mirrors RouteRegionUri's style).
 func RouteDwsuOpenApiHost(ctx context.Context, dwsuId string,
 	relytClient *client.RelytClient, diag *diag.Diagnostics) string {
 	dwsu, err := CommonRetry(ctx, func() (*client.DwsuModel, error) {
@@ -81,7 +102,7 @@ func RouteDwsuOpenApiHost(ctx context.Context, dwsuId string,
 	}
 	uri, perr := PickOpenApiURIFromEndpoints(dwsu.Endpoints)
 	if perr != nil {
-		diag.AddError("openapi endpoint not found on DWSU",
+		diag.AddError("no DMS API endpoint resolvable from DWSU",
 			"dwsuId: "+dwsuId+" error: "+perr.Error())
 		return ""
 	}

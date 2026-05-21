@@ -91,14 +91,57 @@ func TestPickOpenApiURI_Found(t *testing.T) {
 	}
 }
 
-func TestPickOpenApiURI_NotFound(t *testing.T) {
+func TestPickOpenApiURI_FallbackToWebConsole(t *testing.T) {
+	// Real production scenario observed on relytteam.data.cloud: no openapi
+	// endpoint exists, web_console URI contains the per-DWSU path prefix that
+	// /api/* requests need.
 	endpoints := []client.Endpoints{
-		{Type: "web_console", URI: "https://console.example.com"},
+		{Type: "web_console", URI: "https://relytteam.data.cloud/dms/4684766921984/"},
+		{Type: "database", URI: "jdbc:postgresql://x:5432"},
+	}
+	uri, err := PickOpenApiURIFromEndpoints(endpoints)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if uri != "https://relytteam.data.cloud/dms/4684766921984" {
+		t.Fatalf("expected web_console URI with trailing slash trimmed, got %q", uri)
+	}
+}
+
+func TestPickOpenApiURI_NeitherTypeFound(t *testing.T) {
+	endpoints := []client.Endpoints{
 		{Type: "database", URI: "db.example.com:5432"},
 	}
 	_, err := PickOpenApiURIFromEndpoints(endpoints)
 	if err == nil {
-		t.Fatal("expected error when no openapi endpoint present, got nil")
+		t.Fatal("expected error when neither openapi nor web_console present, got nil")
+	}
+}
+
+func TestPickOpenApiURI_OpenApiPreferredOverWebConsole(t *testing.T) {
+	endpoints := []client.Endpoints{
+		{Type: "web_console", URI: "https://console.example.com/"},
+		{Type: "openapi", URI: "https://api.example.com"},
+	}
+	uri, err := PickOpenApiURIFromEndpoints(endpoints)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if uri != "https://api.example.com" {
+		t.Fatalf("expected openapi to win over web_console, got %q", uri)
+	}
+}
+
+func TestPickOpenApiURI_TrimsTrailingSlashOnOpenApi(t *testing.T) {
+	endpoints := []client.Endpoints{
+		{Type: "openapi", URI: "https://api.example.com/"},
+	}
+	uri, err := PickOpenApiURIFromEndpoints(endpoints)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if uri != "https://api.example.com" {
+		t.Fatalf("expected trailing slash trimmed, got %q", uri)
 	}
 }
 

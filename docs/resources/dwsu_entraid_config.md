@@ -83,7 +83,7 @@ resource "relyt_dwsu_entraid_config" "sso" {
 
 ### Optional
 
-- `dms_host` (String) Explicit DMS API host (e.g. `https://<dwsu-domain>`). When set, the provider skips the control-plane DwsuModel lookup that would otherwise be used to resolve the host from `dwsu_id`. Useful for air-gapped / single-tenant / DMS-only deployments where the control-plane service is not reachable. Leave unset (default) for normal multi-tenant environments where the control plane is available.
+- `dms_host` (String) Explicit DMS API host (e.g. `https://<dwsu-domain>` or `https://<frontend>/dms/<dwsu_id>`). When set, the provider skips the control-plane DwsuModel lookup that would otherwise be used to resolve the host from `dwsu_id`. Useful for air-gapped / single-tenant / DMS-only deployments where the control-plane service is not reachable. Leave unset (default) and the provider will resolve the host automatically from `DwsuModel.Endpoints[]`, preferring an `openapi` entry and falling back to `web_console`.
 - `enabled` (Boolean) Whether SSO is active. Set false to retain config but disable login. Default true.
 - `tenant_type` (String) One of 'single' (only users in the configured tenant can log in) or 'multi' (any Azure org user). Default 'single'. Invalid values are rejected by the backend at apply time.
 
