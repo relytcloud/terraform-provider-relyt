@@ -7,6 +7,7 @@ terraform {
 }
 
 provider "relyt" {
+  api_host = "https://<your-domain>" # Required, no default
   role     = "SYSTEMADMIN"
 }
 

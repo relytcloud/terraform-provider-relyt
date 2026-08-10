@@ -92,7 +92,7 @@ func (p *RelytProvider) Schema(ctx context.Context, req provider.SchemaRequest, 
 			//},
 			"api_host": schema.StringAttribute{
 				Optional:    true,
-				Description: "target api address",
+				Description: "The control plane API address of your Relyt deployment, e.g. 'https://<your-domain>'. Required: there is no default, because a wrong value silently targets another environment. Can be set through env 'RELYT_API_HOST'.",
 			},
 			"auth_key": schema.StringAttribute{
 				Optional:    true,
@@ -189,9 +189,22 @@ func (p *RelytProvider) Configure(ctx context.Context, req provider.ConfigureReq
 				"If either is already set, ensure the value is not empty.",
 		)
 	}
+	// No default api_host. The former default ("https://api.data.cloud") points at
+	// a live control plane that serves a different set of clouds, so an unset value
+	// used to silently target the wrong environment: the request succeeds with HTTP
+	// 200 and only fails later with an opaque CLOUD_REGION_NOT_EXIST. Any hardcoded
+	// default is wrong for some deployment, so require it explicitly instead.
 	if apiHost == "" {
-		//apiHost的默认值
-		apiHost = "https://api.data.cloud"
+		resp.Diagnostics.AddAttributeError(
+			path.Root(apiHostEnv.PropertyName),
+			"Missing Relyt API Host",
+			"The provider cannot create the Relyt API client as there is a missing or empty value for the Relyt API Host. "+
+				"Set the "+apiHostEnv.PropertyName+" value in the configuration or use the "+apiHostEnv.EnvKey+" environment variable. "+
+				"There is no default: leaving it unset would silently target whichever control plane the old default resolves to.",
+		)
+	}
+	if resp.Diagnostics.HasError() {
+		return
 	}
 	resourceWaitTimeout := int64(1800)
 	checkInterval := int32(5)
