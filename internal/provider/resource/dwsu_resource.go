@@ -45,12 +45,16 @@ func (r *dwsuResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 	resp.Schema = schema.Schema{
 		Version: 0,
 		Attributes: map[string]schema.Attribute{
-			"id":      schema.StringAttribute{Computed: true, Description: "The ID of the service unit.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
-			"cloud":   schema.StringAttribute{Required: true, Description: "The ID of the cloud provider."},
-			"region":  schema.StringAttribute{Required: true, Description: "The ID of the region."},
-			"domain":  schema.StringAttribute{Required: true, Description: "The domain name of the service unit."},
-			"variant": schema.StringAttribute{Optional: true, Computed: true, Description: "The variables.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, Default: stringdefault.StaticString("basic")},
-			"edition": schema.StringAttribute{Optional: true, Computed: true, Description: "The ID of the edition.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, Default: stringdefault.StaticString("standard")},
+			"id": schema.StringAttribute{Computed: true, Description: "The ID of the service unit.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
+			// cloud/region/domain/variant/edition are fixed at creation: the control
+			// plane exposes no API to change them (the only PATCH on a DWSU is the
+			// network policy). Without RequiresReplace, editing one of them produces
+			// a plan that can never converge — see Update below.
+			"cloud":   schema.StringAttribute{Required: true, Description: "The ID of the cloud provider. Changing this forces a new service unit to be created.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
+			"region":  schema.StringAttribute{Required: true, Description: "The ID of the region. Changing this forces a new service unit to be created.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
+			"domain":  schema.StringAttribute{Required: true, Description: "The domain name of the service unit. Changing this forces a new service unit to be created.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
+			"variant": schema.StringAttribute{Optional: true, Computed: true, Description: "The variables. Changing this forces a new service unit to be created.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown(), stringplanmodifier.RequiresReplace()}, Default: stringdefault.StaticString("basic")},
+			"edition": schema.StringAttribute{Optional: true, Computed: true, Description: "The ID of the edition. Changing this forces a new service unit to be created.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown(), stringplanmodifier.RequiresReplace()}, Default: stringdefault.StaticString("standard")},
 			"alias":   schema.StringAttribute{Optional: true, Description: "The alias of the service unit."},
 			//"last_updated": schema.Int64Attribute{Computed: true},
 			//"status":       schema.StringAttribute{Computed: true},
