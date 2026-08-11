@@ -150,6 +150,35 @@ func (p *RelytClient) DropDps(ctx context.Context, regionUri, dwServiceUnitId, d
 	return nil
 }
 
+// ListClouds returns the cloud providers this control plane serves
+// (GET /infra). Useful as the first discovery call: the valid values of
+// `cloud` differ per deployment and are not guessable.
+func (p *RelytClient) ListClouds(ctx context.Context) ([]*Cloud, error) {
+	resp := CommonRelytResponse[[]*Cloud]{}
+	err := doHttpRequest(p, ctx, "", "/infra", "GET", &resp, nil, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	if resp.Data == nil {
+		return nil, nil
+	}
+	return *resp.Data, nil
+}
+
+// ListCloudRegions returns the regions of one cloud (GET /infra/{cloud}).
+func (p *RelytClient) ListCloudRegions(ctx context.Context, cloud string) ([]*Region, error) {
+	path := fmt.Sprintf("/infra/%s", url.PathEscape(cloud))
+	resp := CommonRelytResponse[[]*Region]{}
+	err := doHttpRequest(p, ctx, "", path, "GET", &resp, nil, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	if resp.Data == nil {
+		return nil, nil
+	}
+	return *resp.Data, nil
+}
+
 func (p *RelytClient) ListSpec(ctx context.Context, edition, dpsType, cloud, region string) ([]Spec, error) {
 	path := fmt.Sprintf("/dwsu/edition/%s/dps/%s/specs", edition, dpsType)
 	specList := CommonRelytResponse[[]Spec]{}
@@ -157,6 +186,9 @@ func (p *RelytClient) ListSpec(ctx context.Context, edition, dpsType, cloud, reg
 	err := doHttpRequest(p, ctx, "", path, "GET", &specList, nil, parameter, nil)
 	if err != nil {
 		return nil, err
+	}
+	if specList.Data == nil {
+		return nil, nil
 	}
 	return *specList.Data, nil
 }

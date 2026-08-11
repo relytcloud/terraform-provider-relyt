@@ -319,6 +319,9 @@ func (p *RelytProvider) DataSources(ctx context.Context) []func() datasource.Dat
 		relytDS.NewDwsuSchemaDetailDataSource,
 		relytDS.NewDwsuListDataSource,
 		relytDS.NewCloudRegionListDataSource,
+		relytDS.NewCloudsDataSource,
+		relytDS.NewCloudRegionsDataSource,
+		relytDS.NewDpsSpecsDataSource,
 	}
 }
 
