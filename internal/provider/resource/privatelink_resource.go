@@ -115,6 +115,24 @@ func (r *PrivateLinkResource) Create(ctx context.Context, req resource.CreateReq
 		resp.Diagnostics.AddError("return type not privatelink", "type convert error")
 		return
 	}
+	// Principal whitelisting is not implemented by every cloud provider: the
+	// create succeeds but the principals are dropped, and the state we return
+	// then contradicts the plan. Terraform reports that as "element 0 has
+	// vanished. This is a bug in the provider", which sends people looking in
+	// the wrong place. Say what actually happened instead.
+	if len(plan.AllowPrincipals.Elements()) > 0 && (pl.AllowedPrincipals == nil || len(*pl.AllowedPrincipals) == 0) {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("allow_principals"),
+			"allow_principals is not supported by this deployment",
+			"The endpoint service was created, but the backend returned an empty principal list, "+
+				"so the principals in the configuration were silently dropped.\n\n"+
+				"This cloud provider does not implement PrivateLink principal whitelisting. "+
+				"Alibaba Cloud, for one, gates access by approving connections instead: the consumer "+
+				"creates the endpoint first, and you approve the pending connection in the console.\n\n"+
+				"Set allow_principals = [] to manage the endpoint service with Terraform.",
+		)
+		return
+	}
 	r.mapRelytToTFModel(nil, pl, &plan, &resp.Diagnostics)
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
