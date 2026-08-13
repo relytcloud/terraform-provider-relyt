@@ -298,7 +298,9 @@ func (r *PrivateLinkResource) mapRelytToTFModel(ctx context.Context, linkInfo *c
 			linkInfo.AllowedPrincipals = new([]string)
 		}
 		readPrincipal := true
-		if len(*linkInfo.AllowedPrincipals) == len(linkModel.AllowPrincipals.Elements()) {
+		// import 后 state 里 allow_principals 是 null，长度同样是 0；此时必须落一个真实的
+		// 空列表，否则 plan 会出现 null -> [] 的假 diff，触发阿里云不支持的 PATCH 调用
+		if !linkModel.AllowPrincipals.IsNull() && len(*linkInfo.AllowedPrincipals) == len(linkModel.AllowPrincipals.Elements()) {
 			//为了保持客户端顺序，这里从服务端读取后判断一下是否长度一样，内容一样。如果不是则发生过变动需要更新
 			set := map[string]bool{}
 			for _, p := range *linkInfo.AllowedPrincipals {
