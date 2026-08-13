@@ -56,7 +56,7 @@ provider "relyt" {
 
 - `api_host` (String) The control plane API address of your Relyt deployment, e.g. 'https://<your-domain>'. Required: there is no default, because a wrong value silently targets another environment. Can be set through env 'RELYT_API_HOST'.
 - `auth_key` (String, Sensitive) Your Console Auth Key! Can be set through env 'RELYT_AUTH_KEY'
-- `client_timeout` (Number) http client timeout seconds! Defaults 10
+- `client_timeout` (Number) HTTP client timeout in seconds. Defaults to 60 — a cold regional endpoint can take over 20s to answer its first request.
 - `data_access_config` (Attributes) data_access_configs (see [below for nested schema](#nestedatt--data_access_config))
 - `resource_check_interval` (Number) Interval second used in wait for cycle check! Defaults 5
 - `resource_check_timeout` (Number) Timeout second used in wait for create and delete dwsu or dps! Defaults 1800

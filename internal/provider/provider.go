@@ -114,7 +114,7 @@ func (p *RelytProvider) Schema(ctx context.Context, req provider.SchemaRequest, 
 			},
 			"client_timeout": schema.Int64Attribute{
 				Optional:    true,
-				Description: "http client timeout seconds! Defaults 10",
+				Description: "HTTP client timeout in seconds. Defaults to 60 — a cold regional endpoint can take over 20s to answer its first request.",
 			},
 			"data_access_config": schema.SingleNestedAttribute{
 				Optional:    true,
@@ -208,7 +208,10 @@ func (p *RelytProvider) Configure(ctx context.Context, req provider.ConfigureReq
 	}
 	resourceWaitTimeout := int64(1800)
 	checkInterval := int32(5)
-	clientTimeout := int32(10)
+	// 10s was too tight: a cold regional endpoint has been measured taking over
+	// 20s to answer the first request (a retry right after took 2.5s), which
+	// failed the apply with a bare context deadline that points nowhere.
+	clientTimeout := int32(60)
 	if !data.ResourceCheckTimeout.IsNull() {
 		tflog.Info(ctx, "resource check wait isn't null! set value:"+strconv.FormatInt(data.ResourceCheckTimeout.ValueInt64(), 10))
 		resourceWaitTimeout = data.ResourceCheckTimeout.ValueInt64()

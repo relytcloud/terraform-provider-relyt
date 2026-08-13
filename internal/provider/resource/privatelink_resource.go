@@ -85,8 +85,15 @@ func (r *PrivateLinkResource) Create(ctx context.Context, req resource.CreateReq
 			return
 		}
 	}
-	//先写一下Status，下次读一下。如果有Status属性则创建一半
+	// Terraform rejects an apply that leaves any Computed attribute unknown, so
+	// service_name has to hold a value on every exit path — including the ones
+	// below that bail out before the service is ready. Seed both computed
+	// attributes here and persist them, so a failure surfaces the real error
+	// instead of "Provider returned invalid result object after apply".
 	plan.Status = types.StringValue(client.PRIVATE_LINK_UNKNOWN)
+	if plan.ServiceName.IsUnknown() {
+		plan.ServiceName = types.StringValue("")
+	}
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
 	privateLinkInfo, err := common.TimeOutTask(r.client.CheckTimeOut, r.client.CheckInterval, func() (any, error) {
