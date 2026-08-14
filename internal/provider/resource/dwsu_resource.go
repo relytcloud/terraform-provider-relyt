@@ -195,10 +195,11 @@ func (r *dwsuResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		return
 	}
 	if relytQueryModel == nil {
-		//	dwsu not found，throw error will cause refresh failed! block destroy. but warning will make import sucess
-		//
-		resp.Diagnostics = diag.Diagnostics{}
-		resp.Diagnostics.AddError("Skip Read", "DWSU not found!")
+		// Gone from the backend: drop it from state so the next plan offers to
+		// recreate it. Erroring here instead left the workspace wedged — refresh
+		// failed, so plan, apply and destroy all became impossible and the only
+		// way out was a manual `terraform state rm`.
+		resp.State.RemoveResource(ctx)
 		return
 	}
 	//state.Status = types.StringValue(dwsu.Status)
