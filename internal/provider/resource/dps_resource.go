@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+	"strconv"
 	"strings"
 	"terraform-provider-relyt/internal/provider/client"
 	"terraform-provider-relyt/internal/provider/common"
@@ -140,18 +141,50 @@ func (r *dpsResource) Read(ctx context.Context, req resource.ReadRequest, resp *
 }
 
 // Update updates the resource and sets the updated Terraform state on success.
+// Update changes the DPS in place. Only size and description are mutable;
+// dwsu_id/name/engine have no corresponding control-plane API and are rejected
+// rather than silently dropped.
 func (r *dpsResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var plan = model.DpsModel{}
-	req.Plan.Get(ctx, &plan)
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	var state = model.DpsModel{}
-	req.State.Get(ctx, &state)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	immutable := []struct {
+		name        string
+		plan, state types.String
+	}{
+		{"dwsu_id", plan.DwsuId, state.DwsuId},
+		{"name", plan.Name, state.Name},
+		{"engine", plan.Engine, state.Engine},
+	}
+	for _, f := range immutable {
+		if !f.plan.Equal(f.state) {
+			resp.Diagnostics.AddAttributeError(path.Root(f.name),
+				f.name+" can't be updated",
+				"This attribute is fixed at creation and the control plane has no API to change it. Revert it to "+
+					strconv.Quote(f.state.ValueString())+", or destroy and recreate the resource.")
+		}
+	}
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// updateDps mutates state.Dps in place with what was actually applied.
 	updateDps(ctx, r.client, &state.Dps, &plan.Dps, &resp.Diagnostics, state.DwsuId.ValueString(), state.ID.ValueString())
-	//if resp.Diagnostics.HasError() {
-	//	return
-	//}
-	//写一下Status，反馈dps最新状态
-	resp.State.Set(ctx, &state)
-	return
+	if resp.Diagnostics.HasError() {
+		// Keep what actually happened rather than the requested plan.
+		resp.State.Set(ctx, &state)
+		return
+	}
+
+	// Persist the plan, not the prior state — see dwsuResource.Update.
+	plan.ID = state.ID
+	plan.Dps = state.Dps
+	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
 // Delete deletes the resource and removes the Terraform state on success.

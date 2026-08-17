@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+	"strconv"
 	"terraform-provider-relyt/internal/provider/client"
 	"terraform-provider-relyt/internal/provider/common"
 	"terraform-provider-relyt/internal/provider/model"
@@ -45,12 +46,16 @@ func (r *dwsuResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 	resp.Schema = schema.Schema{
 		Version: 0,
 		Attributes: map[string]schema.Attribute{
-			"id":      schema.StringAttribute{Computed: true, Description: "The ID of the service unit.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
-			"cloud":   schema.StringAttribute{Required: true, Description: "The ID of the cloud provider."},
-			"region":  schema.StringAttribute{Required: true, Description: "The ID of the region."},
-			"domain":  schema.StringAttribute{Required: true, Description: "The domain name of the service unit."},
-			"variant": schema.StringAttribute{Optional: true, Computed: true, Description: "The variables.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, Default: stringdefault.StaticString("basic")},
-			"edition": schema.StringAttribute{Optional: true, Computed: true, Description: "The ID of the edition.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, Default: stringdefault.StaticString("standard")},
+			"id": schema.StringAttribute{Computed: true, Description: "The ID of the service unit.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
+			// cloud/region/domain/variant/edition are fixed at creation: the control
+			// plane exposes no API to change them (the only PATCH on a DWSU is the
+			// network policy). Without RequiresReplace, editing one of them produces
+			// a plan that can never converge — see Update below.
+			"cloud":   schema.StringAttribute{Required: true, Description: "The ID of the cloud provider. Changing this forces a new service unit to be created.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
+			"region":  schema.StringAttribute{Required: true, Description: "The ID of the region. Changing this forces a new service unit to be created.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
+			"domain":  schema.StringAttribute{Required: true, Description: "The domain name of the service unit. Changing this forces a new service unit to be created.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
+			"variant": schema.StringAttribute{Optional: true, Computed: true, Description: "The variables. Changing this forces a new service unit to be created.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown(), stringplanmodifier.RequiresReplace()}, Default: stringdefault.StaticString("basic")},
+			"edition": schema.StringAttribute{Optional: true, Computed: true, Description: "The ID of the edition. Changing this forces a new service unit to be created.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown(), stringplanmodifier.RequiresReplace()}, Default: stringdefault.StaticString("standard")},
 			"alias":   schema.StringAttribute{Optional: true, Description: "The alias of the service unit."},
 			//"last_updated": schema.Int64Attribute{Computed: true},
 			//"status":       schema.StringAttribute{Computed: true},
@@ -190,10 +195,11 @@ func (r *dwsuResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		return
 	}
 	if relytQueryModel == nil {
-		//	dwsu not found，throw error will cause refresh failed! block destroy. but warning will make import sucess
-		//
-		resp.Diagnostics = diag.Diagnostics{}
-		resp.Diagnostics.AddError("Skip Read", "DWSU not found!")
+		// Gone from the backend: drop it from state so the next plan offers to
+		// recreate it. Erroring here instead left the workspace wedged — refresh
+		// failed, so plan, apply and destroy all became impossible and the only
+		// way out was a manual `terraform state rm`.
+		resp.State.RemoveResource(ctx)
 		return
 	}
 	//state.Status = types.StringValue(dwsu.Status)
@@ -217,22 +223,63 @@ func (r *dwsuResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 }
 
 // Update updates the resource and sets the updated Terraform state on success.
+//
+// Only default_dps size and description can change in place. cloud/region/domain/
+// variant/edition are RequiresReplace (see Schema) so they never reach here; alias
+// and the DPS name/engine have no corresponding control-plane API, so they are
+// rejected rather than silently dropped.
 func (r *dwsuResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	//resp.Diagnostics.AddError("not support", "update dwsu not supported! please rollback your change!")
 	var plan = model.DwsuModel{}
-	req.Plan.Get(ctx, &plan)
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	var state = model.DwsuModel{}
-	req.State.Get(ctx, &state)
-	if plan.DefaultDps.Size != state.DefaultDps.Size {
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if !plan.Alias.Equal(state.Alias) {
+		resp.Diagnostics.AddAttributeError(path.Root("alias"),
+			"alias can't be updated",
+			"The control plane has no API to rename a service unit. Revert alias to "+
+				strconv.Quote(state.Alias.ValueString())+", or destroy and recreate the resource.")
+	}
+	if plan.DefaultDps != nil && state.DefaultDps != nil {
+		if !plan.DefaultDps.Name.Equal(state.DefaultDps.Name) {
+			resp.Diagnostics.AddAttributeError(path.Root("default_dps").AtName("name"),
+				"default_dps.name can't be updated",
+				"The name of the default DPS is fixed at creation. Revert it to "+
+					strconv.Quote(state.DefaultDps.Name.ValueString())+".")
+		}
+		if !plan.DefaultDps.Engine.Equal(state.DefaultDps.Engine) {
+			resp.Diagnostics.AddAttributeError(path.Root("default_dps").AtName("engine"),
+				"default_dps.engine can't be updated",
+				"The engine of the default DPS is fixed at creation. Revert it to "+
+					strconv.Quote(state.DefaultDps.Engine.ValueString())+".")
+		}
+	}
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// updateDps mutates state.DefaultDps in place, recording the size/description
+	// that were actually applied plus the resulting status.
+	if !plan.DefaultDps.Size.Equal(state.DefaultDps.Size) ||
+		!plan.DefaultDps.Description.Equal(state.DefaultDps.Description) {
 		updateDps(ctx, r.client, state.DefaultDps, plan.DefaultDps, &resp.Diagnostics, state.ID.ValueString(), state.ID.ValueString())
-		//反馈给用户，当前dps状态
-		resp.State.Set(ctx, &state)
 		if resp.Diagnostics.HasError() {
+			// Keep what actually happened rather than the requested plan.
+			resp.State.Set(ctx, &state)
 			return
 		}
 	}
-	resp.State.Set(ctx, &state)
-	return
+
+	// Persist the plan, not the prior state: writing state back made every edit
+	// look like a no-op, so terraform reported "inconsistent result after apply"
+	// and replayed the same diff forever. Computed attributes come from state.
+	plan.ID = state.ID
+	plan.Endpoints = state.Endpoints
+	plan.DefaultDps = state.DefaultDps
+	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
 // Delete deletes the resource and removes the Terraform state on success.
@@ -441,6 +488,10 @@ func WaitDwsuReady(ctx context.Context, relytClient *client.RelytClient, dpsId s
 		}
 		if dwsu != nil && dwsu.Status == client.DPS_STATUS_READY {
 			return dwsu, nil
+		}
+		if dwsu != nil && client.IsProvisionFailed(dwsu.Status) {
+			return dwsu, common.Terminal(fmt.Errorf("dwsu provisioning failed, status: %s"+
+				" (check the region service logs for the cause)", dwsu.Status))
 		}
 		return dwsu, fmt.Errorf("dwsu is not Ready")
 	})
