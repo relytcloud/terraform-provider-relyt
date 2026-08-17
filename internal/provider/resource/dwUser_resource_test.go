@@ -17,7 +17,7 @@ func TestLakeFormationActionFor(t *testing.T) {
 		{"omitted from config", types.StringNull(), lakeFormationSkip},
 		{"not resolved yet", types.StringUnknown(), lakeFormationSkip},
 		{"explicitly emptied", types.StringValue(""), lakeFormationDelete},
-		{"configured value", types.StringValue("huyang@example.com"), lakeFormationSet},
+		{"configured value", types.StringValue("lakehouse-user@example.com"), lakeFormationSet},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

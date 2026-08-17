@@ -46,7 +46,7 @@ func TestPickRegionOpenApiMeta_MultipleEntriesAreFine(t *testing.T) {
 func TestPickRegionOpenApiMeta_FallbackToWebConsole(t *testing.T) {
 	got, err := PickRegionOpenApiMeta("alibabacloud", "cn-hongkong", metas(
 		&OpenApiMetaInfo{Type: "database", URI: "jdbc:postgresql://x:5432"},
-		&OpenApiMetaInfo{Type: "web_console", URI: "https://alitest.data.cloud/dms/178900107/"},
+		&OpenApiMetaInfo{Type: "web_console", URI: "https://console.example.com/dms/12345/"},
 	))
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
