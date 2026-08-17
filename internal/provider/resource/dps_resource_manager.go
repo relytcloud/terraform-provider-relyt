@@ -117,6 +117,10 @@ func WaitDpsReady(ctx context.Context, relytClient *client.RelytClient, regionUr
 		if dps != nil && dps.Status == client.DPS_STATUS_READY {
 			return dps, nil
 		}
+		if dps != nil && client.IsProvisionFailed(dps.Status) {
+			return dps, common.Terminal(fmt.Errorf("dps provisioning failed, status: %s"+
+				" (check the region service logs for the cause)", dps.Status))
+		}
 		return dps, fmt.Errorf("dps is not Ready")
 	})
 	if err != nil {

@@ -489,6 +489,10 @@ func WaitDwsuReady(ctx context.Context, relytClient *client.RelytClient, dpsId s
 		if dwsu != nil && dwsu.Status == client.DPS_STATUS_READY {
 			return dwsu, nil
 		}
+		if dwsu != nil && client.IsProvisionFailed(dwsu.Status) {
+			return dwsu, common.Terminal(fmt.Errorf("dwsu provisioning failed, status: %s"+
+				" (check the region service logs for the cause)", dwsu.Status))
+		}
 		return dwsu, fmt.Errorf("dwsu is not Ready")
 	})
 	return queryDwsuModel, err

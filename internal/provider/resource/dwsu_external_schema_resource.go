@@ -107,12 +107,15 @@ func (r *DwsuExternalSchemaResource) Read(ctx context.Context, req resource.Read
 	getExternalSchema, err := common.CommonRetry(ctx, func() (*client.SchemaMeta, error) {
 		return dbClient.GetExternalSchema(ctx, dbSchema)
 	})
-	if err != nil || getExternalSchema == nil {
-		msg := " schema not found!"
-		if err != nil {
-			msg = err.Error()
-		}
-		resp.Diagnostics.AddError("Failed to Read schema", "error to Read schema:"+msg)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to Read schema", "error to Read schema:"+err.Error())
+		return
+	}
+	if getExternalSchema == nil {
+		// Gone from the backend: drop it from state so the next plan offers to
+		// recreate it. Erroring here would fail refresh, which blocks plan,
+		// apply and destroy alike.
+		resp.State.RemoveResource(ctx)
 		return
 	}
 	if getExternalSchema.Properties == nil {

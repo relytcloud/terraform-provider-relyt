@@ -104,6 +104,12 @@ func (r *PrivateLinkResource) Create(ctx context.Context, req resource.CreateReq
 		if linkService != nil && linkService.Status == client.PRIVATE_LINK_READY {
 			return linkService, nil
 		}
+		if linkService != nil && client.IsProvisionFailed(linkService.Status) {
+			return linkService, common.Terminal(fmt.Errorf("private link provisioning failed, status: %s"+
+				" (check the region service logs for the cause)", linkService.Status))
+		}
+		// A rolled-back cloud workflow has been seen to leave the status at
+		// CREATING indefinitely, in which case only the timeout ends the wait.
 		return linkService, fmt.Errorf("status not ready")
 	})
 	if err != nil {
