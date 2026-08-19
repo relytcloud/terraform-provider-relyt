@@ -49,13 +49,15 @@ func (r *dwsuResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 			"id": schema.StringAttribute{Computed: true, Description: "The ID of the service unit.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
 			// cloud/region/domain/variant/edition are fixed at creation: the control
 			// plane exposes no API to change them (the only PATCH on a DWSU is the
-			// network policy). Without RequiresReplace, editing one of them produces
-			// a plan that can never converge — see Update below.
-			"cloud":   schema.StringAttribute{Required: true, Description: "The ID of the cloud provider. Changing this forces a new service unit to be created.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
-			"region":  schema.StringAttribute{Required: true, Description: "The ID of the region. Changing this forces a new service unit to be created.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
-			"domain":  schema.StringAttribute{Required: true, Description: "The domain name of the service unit. Changing this forces a new service unit to be created.", PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()}},
-			"variant": schema.StringAttribute{Optional: true, Computed: true, Description: "The variables. Changing this forces a new service unit to be created.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown(), stringplanmodifier.RequiresReplace()}, Default: stringdefault.StaticString("basic")},
-			"edition": schema.StringAttribute{Optional: true, Computed: true, Description: "The ID of the edition. Changing this forces a new service unit to be created.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown(), stringplanmodifier.RequiresReplace()}, Default: stringdefault.StaticString("standard")},
+			// network policy). Editing one is rejected in Update rather than marked
+			// RequiresReplace — a replacement plan would offer to destroy a live
+			// warehouse over what is usually a typo or historic state drift, and an
+			// auto-approved pipeline would carry it out.
+			"cloud":   schema.StringAttribute{Required: true, Description: "The ID of the cloud provider. Cannot be changed after creation; an update is rejected."},
+			"region":  schema.StringAttribute{Required: true, Description: "The ID of the region. Cannot be changed after creation; an update is rejected."},
+			"domain":  schema.StringAttribute{Required: true, Description: "The domain name of the service unit. Cannot be changed after creation; an update is rejected."},
+			"variant": schema.StringAttribute{Optional: true, Computed: true, Description: "The variables. Cannot be changed after creation; an update is rejected.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, Default: stringdefault.StaticString("basic")},
+			"edition": schema.StringAttribute{Optional: true, Computed: true, Description: "The ID of the edition. Cannot be changed after creation; an update is rejected.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}, Default: stringdefault.StaticString("standard")},
 			"alias":   schema.StringAttribute{Optional: true, Description: "The alias of the service unit."},
 			//"last_updated": schema.Int64Attribute{Computed: true},
 			//"status":       schema.StringAttribute{Computed: true},
@@ -237,6 +239,30 @@ func (r *dwsuResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		return
 	}
 
+	// These are fixed at creation and the control plane has no API to change
+	// them. Rejecting the update here (instead of RequiresReplace on the schema)
+	// is deliberate: a replacement plan would offer to destroy a live warehouse
+	// over what is usually a typo or historic state drift, and an auto-approved
+	// pipeline would go through with it. An error is recoverable; a destroyed
+	// warehouse is not.
+	immutable := []struct {
+		name        string
+		plan, state types.String
+	}{
+		{"cloud", plan.Cloud, state.Cloud},
+		{"region", plan.Region, state.Region},
+		{"domain", plan.Domain, state.Domain},
+		{"variant", plan.Variant, state.Variant},
+		{"edition", plan.Edition, state.Edition},
+	}
+	for _, f := range immutable {
+		if !f.plan.Equal(f.state) {
+			resp.Diagnostics.AddAttributeError(path.Root(f.name),
+				f.name+" can't be updated",
+				"This attribute is fixed at creation and the control plane has no API to change it. Revert it to "+
+					strconv.Quote(f.state.ValueString())+", or destroy and recreate the resource.")
+		}
+	}
 	if !plan.Alias.Equal(state.Alias) {
 		resp.Diagnostics.AddAttributeError(path.Root("alias"),
 			"alias can't be updated",
