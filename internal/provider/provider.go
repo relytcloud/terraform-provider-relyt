@@ -42,6 +42,10 @@ type RelytProviderEnv struct {
 	detailSuggest  string
 }
 
+// DefaultApiHost is the original AWS control plane, used when api_host is left
+// unset so configurations predating multi-cloud support keep working.
+const DefaultApiHost = "https://api.data.cloud"
+
 var (
 	apiHostEnv = RelytProviderEnv{
 		EnvKey:         "RELYT_API_HOST",
@@ -92,7 +96,7 @@ func (p *RelytProvider) Schema(ctx context.Context, req provider.SchemaRequest, 
 			//},
 			"api_host": schema.StringAttribute{
 				Optional:    true,
-				Description: "The control plane API address of your Relyt deployment, e.g. 'https://<your-domain>'. Required: there is no default, because a wrong value silently targets another environment. Can be set through env 'RELYT_API_HOST'.",
+				Description: "The control plane API address of your Relyt deployment, e.g. 'https://<your-domain>'. Defaults to " + DefaultApiHost + ", the original AWS control plane; set it explicitly for any other deployment, since that default reaches only one of them. Can be set through env 'RELYT_API_HOST'.",
 			},
 			"auth_key": schema.StringAttribute{
 				Optional:    true,
@@ -189,19 +193,13 @@ func (p *RelytProvider) Configure(ctx context.Context, req provider.ConfigureReq
 				"If either is already set, ensure the value is not empty.",
 		)
 	}
-	// No default api_host. The former default ("https://api.data.cloud") points at
-	// a live control plane that serves a different set of clouds, so an unset value
-	// used to silently target the wrong environment: the request succeeds with HTTP
-	// 200 and only fails later with an opaque CLOUD_REGION_NOT_EXIST. Any hardcoded
-	// default is wrong for some deployment, so require it explicitly instead.
 	if apiHost == "" {
-		resp.Diagnostics.AddAttributeError(
-			path.Root(apiHostEnv.PropertyName),
-			"Missing Relyt API Host",
-			"The provider cannot create the Relyt API client as there is a missing or empty value for the Relyt API Host. "+
-				"Set the "+apiHostEnv.PropertyName+" value in the configuration or use the "+apiHostEnv.EnvKey+" environment variable. "+
-				"There is no default: leaving it unset would silently target whichever control plane the old default resolves to.",
-		)
+		// Kept for the configurations written against the original AWS control
+		// plane, which omit api_host entirely. Deployments on any other control
+		// plane have to set it: this default reaches only one of them, and
+		// pointing at the wrong one fails late with an opaque
+		// CLOUD_REGION_NOT_EXIST rather than a connection error.
+		apiHost = DefaultApiHost
 	}
 	if resp.Diagnostics.HasError() {
 		return
