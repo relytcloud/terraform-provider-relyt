@@ -22,9 +22,10 @@ terraform {
 }
 
 provider "relyt" {
-  # Required. There is no default: an unset api_host would silently target
-  # whichever control plane the old default resolves to, which may be a
-  # completely different environment. Can also be set via RELYT_API_HOST.
+  # Defaults to https://api.data.cloud, the original AWS control plane. Any
+  # other deployment has to set this: the wrong control plane answers, and the
+  # mismatch only surfaces later as CLOUD_REGION_NOT_EXIST. Can also be set
+  # via RELYT_API_HOST.
   api_host = "https://<your-domain>"
   auth_key = "9a3727e5b9c0mockaGbll2HVLVKLLY1AyjOilAqeyPOBAb74A7VlMOCKTi0bJWJd3"
   role     = "SYSTEMADMIN"
@@ -54,7 +55,7 @@ provider "relyt" {
 
 ### Optional
 
-- `api_host` (String) The control plane API address of your Relyt deployment, e.g. 'https://<your-domain>'. Required: there is no default, because a wrong value silently targets another environment. Can be set through env 'RELYT_API_HOST'.
+- `api_host` (String) The control plane API address of your Relyt deployment, e.g. 'https://<your-domain>'. Defaults to https://api.data.cloud, the original AWS control plane; set it explicitly for any other deployment, since that default reaches only one of them. Can be set through env 'RELYT_API_HOST'.
 - `auth_key` (String, Sensitive) Your Console Auth Key! Can be set through env 'RELYT_AUTH_KEY'
 - `client_timeout` (Number) HTTP client timeout in seconds. Defaults to 60 — a cold regional endpoint can take over 20s to answer its first request.
 - `data_access_config` (Attributes) data_access_configs (see [below for nested schema](#nestedatt--data_access_config))
