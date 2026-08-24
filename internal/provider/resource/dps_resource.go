@@ -177,7 +177,7 @@ func (r *dpsResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	updateDps(ctx, r.client, &state.Dps, &plan.Dps, &resp.Diagnostics, state.DwsuId.ValueString(), state.ID.ValueString())
 	if resp.Diagnostics.HasError() {
 		// Keep what actually happened rather than the requested plan.
-		resp.State.Set(ctx, &state)
+		resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 		return
 	}
 

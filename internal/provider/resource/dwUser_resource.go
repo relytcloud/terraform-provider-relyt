@@ -93,25 +93,8 @@ func (r *dwUserResource) Create(ctx context.Context, req resource.CreateRequest,
 	// State goes in after handleAccountConfig so the normalized (never unknown)
 	// lakeformation value lands in it. Written even when the config calls failed:
 	// the account exists on the server, so dropping it from state orphans it.
-	diags = resp.State.Set(ctx, &dwUserModel)
-	//if resp.Diagnostics.HasError() {
-	//这里注释掉主动回滚，应该由用户回滚
-	//err := r.client.DropAccount(ctx, regionUri, dwUserModel.DwsuId.ValueString(), dwUserModel.ID.ValueString())
-	//if err != nil {
-	//	resp.Diagnostics.AddError(
-	//		"Error rollback create dwuser",
-	//		"Could not rollback dwuser! please clear it with destroy or manual! userId: "+dwUserModel.ID.ValueString()+""+err.Error(),
-	//	)
-	//}
-	//}
-	if resp.Diagnostics.HasError() {
-		//如果有异常，dwuser不要写状态
-		return
-	}
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
+	// No rollback on failure: the account exists on the server, the user decides.
+	resp.Diagnostics.Append(resp.State.Set(ctx, &dwUserModel)...)
 }
 
 // Read resource information.

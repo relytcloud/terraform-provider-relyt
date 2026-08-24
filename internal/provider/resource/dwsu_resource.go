@@ -226,10 +226,11 @@ func (r *dwsuResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 
 // Update updates the resource and sets the updated Terraform state on success.
 //
-// Only default_dps size and description can change in place. cloud/region/domain/
-// variant/edition are RequiresReplace (see Schema) so they never reach here; alias
-// and the DPS name/engine have no corresponding control-plane API, so they are
-// rejected rather than silently dropped.
+// Only default_dps size and description can change in place. Everything else
+// (cloud/region/domain/variant/edition, alias, the DPS name/engine) has no
+// corresponding control-plane API, so edits to those are rejected below rather
+// than silently dropped — deliberately not RequiresReplace, see the Schema
+// comment.
 func (r *dwsuResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var plan = model.DwsuModel{}
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
@@ -269,19 +270,20 @@ func (r *dwsuResource) Update(ctx context.Context, req resource.UpdateRequest, r
 			"The control plane has no API to rename a service unit. Revert alias to "+
 				strconv.Quote(state.Alias.ValueString())+", or destroy and recreate the resource.")
 	}
-	if plan.DefaultDps != nil && state.DefaultDps != nil {
-		if !plan.DefaultDps.Name.Equal(state.DefaultDps.Name) {
-			resp.Diagnostics.AddAttributeError(path.Root("default_dps").AtName("name"),
-				"default_dps.name can't be updated",
-				"The name of the default DPS is fixed at creation. Revert it to "+
-					strconv.Quote(state.DefaultDps.Name.ValueString())+".")
-		}
-		if !plan.DefaultDps.Engine.Equal(state.DefaultDps.Engine) {
-			resp.Diagnostics.AddAttributeError(path.Root("default_dps").AtName("engine"),
-				"default_dps.engine can't be updated",
-				"The engine of the default DPS is fixed at creation. Revert it to "+
-					strconv.Quote(state.DefaultDps.Engine.ValueString())+".")
-		}
+	// default_dps is Required in the schema, so the framework guarantees it is
+	// non-nil in both plan and state (Create/Read always populate it) — no nil
+	// guard here, matching the unguarded dereferences further down.
+	if !plan.DefaultDps.Name.Equal(state.DefaultDps.Name) {
+		resp.Diagnostics.AddAttributeError(path.Root("default_dps").AtName("name"),
+			"default_dps.name can't be updated",
+			"The name of the default DPS is fixed at creation. Revert it to "+
+				strconv.Quote(state.DefaultDps.Name.ValueString())+".")
+	}
+	if !plan.DefaultDps.Engine.Equal(state.DefaultDps.Engine) {
+		resp.Diagnostics.AddAttributeError(path.Root("default_dps").AtName("engine"),
+			"default_dps.engine can't be updated",
+			"The engine of the default DPS is fixed at creation. Revert it to "+
+				strconv.Quote(state.DefaultDps.Engine.ValueString())+".")
 	}
 	if resp.Diagnostics.HasError() {
 		return
@@ -294,7 +296,7 @@ func (r *dwsuResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		updateDps(ctx, r.client, state.DefaultDps, plan.DefaultDps, &resp.Diagnostics, state.ID.ValueString(), state.ID.ValueString())
 		if resp.Diagnostics.HasError() {
 			// Keep what actually happened rather than the requested plan.
-			resp.State.Set(ctx, &state)
+			resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 			return
 		}
 	}
