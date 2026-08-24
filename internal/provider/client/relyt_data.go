@@ -5,36 +5,12 @@ const (
 	DPS_STATUS_DROPPED   = "DROPPED"
 	PRIVATE_LINK_READY   = "READY"
 	PRIVATE_LINK_UNKNOWN = "UNKNOWN"
-
-	// Provisioning failures surface under two spellings: the region service's
-	// internal state machine writes PROVISION_FAILED while its API hands out
-	// PROVISIONING_FAILED, so both have to be matched.
-	STATUS_PROVISION_FAILED    = "PROVISION_FAILED"
-	STATUS_PROVISIONING_FAILED = "PROVISIONING_FAILED"
-	CODE_SUCCESS               = 200
-	CODE_USER_NOT_FOUND        = 134084
+	CODE_SUCCESS         = 200
+	CODE_USER_NOT_FOUND  = 134084
 	//CODE_ROLE_NOT_EXIST = 134085
 	CODE_DPS_NOT_FOUND  = 137073
 	CODE_DWSU_NOT_FOUND = 65544
 )
-
-// IsProvisionFailed reports whether a status means provisioning has ended
-// unsuccessfully, so a wait loop should give up instead of polling on. Without
-// this the loops treated every non-READY status as "still working" and burned
-// the whole resource_check_timeout before reporting a uselessly vague error.
-//
-// DROPPED is deliberately absent: the delete paths wait *for* that status.
-//
-// The failure does not show up immediately either — the region service runs a
-// repair workflow first (a 10 minute window in the observed case) and only then
-// moves the status, so polling still has to outlive that window.
-func IsProvisionFailed(status string) bool {
-	switch status {
-	case STATUS_PROVISION_FAILED, STATUS_PROVISIONING_FAILED:
-		return true
-	}
-	return false
-}
 
 type CommonRelytResponse[T any] struct {
 	Code int    `json:"code,omitempty"`

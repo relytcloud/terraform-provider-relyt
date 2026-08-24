@@ -42,10 +42,6 @@ type RelytProviderEnv struct {
 	detailSuggest  string
 }
 
-// DefaultApiHost is the original AWS control plane, used when api_host is left
-// unset so configurations predating multi-cloud support keep working.
-const DefaultApiHost = "https://api.data.cloud"
-
 var (
 	apiHostEnv = RelytProviderEnv{
 		EnvKey:         "RELYT_API_HOST",
@@ -96,7 +92,7 @@ func (p *RelytProvider) Schema(ctx context.Context, req provider.SchemaRequest, 
 			//},
 			"api_host": schema.StringAttribute{
 				Optional:    true,
-				Description: "The control plane API address of your Relyt deployment, e.g. 'https://<your-domain>'. Defaults to " + DefaultApiHost + ", the original AWS control plane; set it explicitly for any other deployment, since that default reaches only one of them. Can be set through env 'RELYT_API_HOST'.",
+				Description: "target api address",
 			},
 			"auth_key": schema.StringAttribute{
 				Optional:    true,
@@ -118,7 +114,7 @@ func (p *RelytProvider) Schema(ctx context.Context, req provider.SchemaRequest, 
 			},
 			"client_timeout": schema.Int64Attribute{
 				Optional:    true,
-				Description: "HTTP client timeout in seconds. Defaults to 60 — a cold regional endpoint can take over 20s to answer its first request.",
+				Description: "http client timeout seconds! Defaults 10",
 			},
 			"data_access_config": schema.SingleNestedAttribute{
 				Optional:    true,
@@ -194,22 +190,12 @@ func (p *RelytProvider) Configure(ctx context.Context, req provider.ConfigureReq
 		)
 	}
 	if apiHost == "" {
-		// Kept for the configurations written against the original AWS control
-		// plane, which omit api_host entirely. Deployments on any other control
-		// plane have to set it: this default reaches only one of them, and
-		// pointing at the wrong one fails late with an opaque
-		// CLOUD_REGION_NOT_EXIST rather than a connection error.
-		apiHost = DefaultApiHost
-	}
-	if resp.Diagnostics.HasError() {
-		return
+		//apiHost的默认值
+		apiHost = "https://api.data.cloud"
 	}
 	resourceWaitTimeout := int64(1800)
 	checkInterval := int32(5)
-	// 10s was too tight: a cold regional endpoint has been measured taking over
-	// 20s to answer the first request (a retry right after took 2.5s), which
-	// failed the apply with a bare context deadline that points nowhere.
-	clientTimeout := int32(60)
+	clientTimeout := int32(10)
 	if !data.ResourceCheckTimeout.IsNull() {
 		tflog.Info(ctx, "resource check wait isn't null! set value:"+strconv.FormatInt(data.ResourceCheckTimeout.ValueInt64(), 10))
 		resourceWaitTimeout = data.ResourceCheckTimeout.ValueInt64()
@@ -320,9 +306,6 @@ func (p *RelytProvider) DataSources(ctx context.Context) []func() datasource.Dat
 		relytDS.NewDwsuSchemaDetailDataSource,
 		relytDS.NewDwsuListDataSource,
 		relytDS.NewCloudRegionListDataSource,
-		relytDS.NewCloudsDataSource,
-		relytDS.NewCloudRegionsDataSource,
-		relytDS.NewDpsSpecsDataSource,
 	}
 }
 
