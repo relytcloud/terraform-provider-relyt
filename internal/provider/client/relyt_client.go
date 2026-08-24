@@ -150,6 +150,35 @@ func (p *RelytClient) DropDps(ctx context.Context, regionUri, dwServiceUnitId, d
 	return nil
 }
 
+// ListClouds returns the cloud providers this control plane serves
+// (GET /infra). Useful as the first discovery call: the valid values of
+// `cloud` differ per deployment and are not guessable.
+func (p *RelytClient) ListClouds(ctx context.Context) ([]*Cloud, error) {
+	resp := CommonRelytResponse[[]*Cloud]{}
+	err := doHttpRequest(p, ctx, "", "/infra", "GET", &resp, nil, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	if resp.Data == nil {
+		return nil, nil
+	}
+	return *resp.Data, nil
+}
+
+// ListCloudRegions returns the regions of one cloud (GET /infra/{cloud}).
+func (p *RelytClient) ListCloudRegions(ctx context.Context, cloud string) ([]*Region, error) {
+	path := fmt.Sprintf("/infra/%s", url.PathEscape(cloud))
+	resp := CommonRelytResponse[[]*Region]{}
+	err := doHttpRequest(p, ctx, "", path, "GET", &resp, nil, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	if resp.Data == nil {
+		return nil, nil
+	}
+	return *resp.Data, nil
+}
+
 func (p *RelytClient) ListSpec(ctx context.Context, edition, dpsType, cloud, region string) ([]Spec, error) {
 	path := fmt.Sprintf("/dwsu/edition/%s/dps/%s/specs", edition, dpsType)
 	specList := CommonRelytResponse[[]Spec]{}
@@ -157,6 +186,9 @@ func (p *RelytClient) ListSpec(ctx context.Context, edition, dpsType, cloud, reg
 	err := doHttpRequest(p, ctx, "", path, "GET", &specList, nil, parameter, nil)
 	if err != nil {
 		return nil, err
+	}
+	if specList.Data == nil {
+		return nil, nil
 	}
 	return *specList.Data, nil
 }
@@ -284,11 +316,43 @@ func (p *RelytClient) GetOpenApiMeta(ctx context.Context, cloud, region string) 
 	if err != nil {
 		return nil, err
 	}
-	lengthOfApi := len(*resp.Data)
-	if lengthOfApi != 1 {
-		return nil, fmt.Errorf("error read regionApi! length of api " + strconv.Itoa(lengthOfApi))
+	return PickRegionOpenApiMeta(cloud, region, resp.Data)
+}
+
+// PickRegionOpenApiMeta selects the entry to use as the regional API host from
+// what /infra/{cloud}/{region}/endpoint returned.
+//
+// The endpoint is not filtered server-side: it returns every endpoint registered
+// for the region. Requiring exactly one entry therefore broke as soon as an
+// operator registered a second type, and the resulting "length of api 2" said
+// nothing about the cause. Select by type instead, preferring "openapi" and
+// falling back to "web_console" to match common.PickOpenApiURIFromEndpoints.
+//
+// Pure function (no network), unit-testable.
+func PickRegionOpenApiMeta(cloud, region string, metas *[]*OpenApiMetaInfo) (*OpenApiMetaInfo, error) {
+	if metas == nil || len(*metas) == 0 {
+		return nil, fmt.Errorf("no endpoint is registered for %s/%s. "+
+			"ask your operator to register an 'openapi' endpoint for this region", cloud, region)
 	}
-	return (*resp.Data)[0], nil
+	var fallback *OpenApiMetaInfo
+	types := make([]string, 0, len(*metas))
+	for _, m := range *metas {
+		if m == nil {
+			continue
+		}
+		types = append(types, m.Type)
+		if m.Type == "openapi" {
+			return m, nil
+		}
+		if m.Type == "web_console" && fallback == nil {
+			fallback = m
+		}
+	}
+	if fallback != nil {
+		return fallback, nil
+	}
+	return nil, fmt.Errorf("no 'openapi' or 'web_console' endpoint registered for %s/%s, got types: %v",
+		cloud, region, types)
 }
 
 func (p *RelytClient) GetDwsuOpenApiMeta(ctx context.Context, dwsuId string) (*OpenApiMetaInfo, error) {
