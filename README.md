@@ -11,7 +11,6 @@
     }
     
     provider "relyt" {
-      api_host = "https://<your-domain>" # Required, no default. Ask your operator for the control plane address of your deployment.
       auth_key = "<api_key>" # Copy the API key you obtained from the previous step.
       role     = "SYSTEMADMIN" # The system role for the Relyt cloud account to create, fixed to SYSTEMADMIN.
     }

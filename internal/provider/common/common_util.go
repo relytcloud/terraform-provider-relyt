@@ -2,7 +2,6 @@ package common
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
@@ -132,18 +131,6 @@ func CommonRetry[T any](ctx context.Context, retryableFunc func() (*T, error)) (
 	return RetryFunction(ctx, 5, 1, 1.0, retryableFunc)
 }
 
-// terminalError marks a task failure that must not be retried.
-type terminalError struct{ err error }
-
-func (e terminalError) Error() string { return e.err.Error() }
-func (e terminalError) Unwrap() error { return e.err }
-
-// Terminal wraps err so TimeOutTask stops polling and reports it right away.
-// Use it when the remote object has reached a state it will not leave — waiting
-// out the rest of resource_check_timeout only delays the same failure and
-// replaces its cause with a generic "not ready" message.
-func Terminal(err error) error { return terminalError{err: err} }
-
 func TimeOutTask(timeoutSec int64, checkIntervalSec int32, task func() (any, error)) (any, error) {
 	// 设置超时时间
 	timeout := time.Duration(timeoutSec) * time.Second
@@ -173,10 +160,6 @@ func TimeOutTask(timeoutSec int64, checkIntervalSec int32, task func() (any, err
 			if err == nil {
 				//done <- true
 				return a, err
-			}
-			var terminal terminalError
-			if errors.As(err, &terminal) {
-				return a, terminal.err
 			}
 			time.Sleep(interval)
 		}
