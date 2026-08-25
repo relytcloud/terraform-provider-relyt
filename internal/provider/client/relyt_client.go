@@ -327,9 +327,6 @@ func (p *RelytClient) GetOpenApiMeta(ctx context.Context, cloud, region string) 
 // operator registered a second type, and the resulting "length of api 2" said
 // nothing about the cause. Select by type instead, preferring "openapi" and
 // falling back to "web_console" to match common.PickOpenApiURIFromEndpoints.
-// A single entry of any other type is still returned as-is — the pre-migration
-// behavior — so a deployment whose lone endpoint carries an unexpected type
-// keeps working.
 //
 // Pure function (no network), unit-testable.
 func PickRegionOpenApiMeta(cloud, region string, metas *[]*OpenApiMetaInfo) (*OpenApiMetaInfo, error) {
@@ -337,15 +334,12 @@ func PickRegionOpenApiMeta(cloud, region string, metas *[]*OpenApiMetaInfo) (*Op
 		return nil, fmt.Errorf("no endpoint is registered for %s/%s. "+
 			"ask your operator to register an 'openapi' endpoint for this region", cloud, region)
 	}
-	var fallback, single *OpenApiMetaInfo
-	nonNil := 0
+	var fallback *OpenApiMetaInfo
 	types := make([]string, 0, len(*metas))
 	for _, m := range *metas {
 		if m == nil {
 			continue
 		}
-		nonNil++
-		single = m
 		types = append(types, m.Type)
 		if m.Type == "openapi" {
 			return m, nil
@@ -356,12 +350,6 @@ func PickRegionOpenApiMeta(cloud, region string, metas *[]*OpenApiMetaInfo) (*Op
 	}
 	if fallback != nil {
 		return fallback, nil
-	}
-	// Exactly one endpoint of an unrecognized type: return it. This is what the
-	// pre-migration code did unconditionally, and deployments in the field (AWS)
-	// may register their single endpoint under a type this code has never seen.
-	if nonNil == 1 {
-		return single, nil
 	}
 	return nil, fmt.Errorf("no 'openapi' or 'web_console' endpoint registered for %s/%s, got types: %v",
 		cloud, region, types)
