@@ -76,6 +76,23 @@ func TestPickRegionOpenApiMeta_NilData(t *testing.T) {
 	}
 }
 
+// The pre-migration code returned the entry unseen whenever exactly one came
+// back. AWS deployments are known to work that way and their endpoint type has
+// never been observed, so a lone entry must keep winning whatever its type.
+func TestPickRegionOpenApiMeta_SingleEntryOfAnyTypeWins(t *testing.T) {
+	for _, typ := range []string{"", "something_new"} {
+		got, err := PickRegionOpenApiMeta("aws", "us-east-1", metas(
+			&OpenApiMetaInfo{Type: typ, URI: "https://api.example.com"},
+		))
+		if err != nil {
+			t.Fatalf("type %q: unexpected err: %v", typ, err)
+		}
+		if got.URI != "https://api.example.com" {
+			t.Fatalf("type %q: expected the single entry, got %q", typ, got.URI)
+		}
+	}
+}
+
 // Neither usable type present: the message must list what did come back, so the
 // cause is visible without server-side access.
 func TestPickRegionOpenApiMeta_UnusableTypesAreListed(t *testing.T) {
