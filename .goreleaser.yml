@@ -52,6 +52,9 @@ signs:
       - "--detach-sign"
       - "${artifact}"
 release:
+  # Mark tags containing a hyphen (v1.5.1-pre, v2.0.0-rc1) as GitHub pre-releases
+  # so they do not take over the "Latest release" pointer.
+  prerelease: auto
   extra_files:
     - glob: 'terraform-registry-manifest.json'
       name_template: '{{ .ProjectName }}_{{ .Version }}_manifest.json'
