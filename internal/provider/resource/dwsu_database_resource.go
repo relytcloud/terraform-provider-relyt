@@ -80,12 +80,15 @@ func (r *DwsuDatabaseResource) Read(ctx context.Context, req resource.ReadReques
 	getDatabase, err := common.CommonRetry(ctx, func() (*client.Database, error) {
 		return dbClient.GetDatabase(ctx, database.Name.ValueString())
 	})
-	if err != nil || getDatabase == nil {
-		msg := " database not found!"
-		if err != nil {
-			msg = err.Error()
-		}
-		resp.Diagnostics.AddError("Failed read database", "error read database "+msg)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed read database", "error read database "+err.Error())
+		return
+	}
+	if getDatabase == nil {
+		// Gone from the backend: drop it from state so the next plan offers to
+		// recreate it. Erroring here would fail refresh, which blocks plan,
+		// apply and destroy alike.
+		resp.State.RemoveResource(ctx)
 		return
 	}
 	database.Owner = types.StringPointerValue(getDatabase.Owner)

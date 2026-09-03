@@ -36,7 +36,7 @@ resource "relyt_dwuser" "user1" {
 
 - `async_query_result_location_aws_role_arn` (String) The ARN of the role to access the output location, optional.
 - `async_query_result_location_prefix` (String) The prefix of the path to the S3 output location.
-- `datalake_aws_lakeformation_role_arn` (String) The ARN of the cross-account IAM role, optional.
+- `datalake_aws_lakeformation_role_arn` (String) The ARN of the cross-account IAM role, optional. On Alibaba Cloud this holds the external lakehouse identity binding instead. Omit to leave the server value untouched; set to "" to remove it.
 
 ### Read-Only
 

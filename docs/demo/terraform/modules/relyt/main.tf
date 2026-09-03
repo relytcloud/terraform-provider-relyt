@@ -7,6 +7,7 @@ terraform {
 }
 
 provider "relyt" {
+  api_host = "https://<your-domain>" # Defaults to https://api.data.cloud (AWS control plane); set for any other deployment
   role     = "SYSTEMADMIN"
 }
 

@@ -11,6 +11,7 @@
     }
     
     provider "relyt" {
+      api_host = "https://<your-domain>" # Defaults to https://api.data.cloud (the original AWS control plane). Set it to your deployment's control plane address — ask your operator.
       auth_key = "<api_key>" # Copy the API key you obtained from the previous step.
       role     = "SYSTEMADMIN" # The system role for the Relyt cloud account to create, fixed to SYSTEMADMIN.
     }

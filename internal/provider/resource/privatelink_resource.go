@@ -85,8 +85,15 @@ func (r *PrivateLinkResource) Create(ctx context.Context, req resource.CreateReq
 			return
 		}
 	}
-	//先写一下Status，下次读一下。如果有Status属性则创建一半
+	// Terraform rejects an apply that leaves any Computed attribute unknown, so
+	// service_name has to hold a value on every exit path — including the ones
+	// below that bail out before the service is ready. Seed both computed
+	// attributes here and persist them, so a failure surfaces the real error
+	// instead of "Provider returned invalid result object after apply".
 	plan.Status = types.StringValue(client.PRIVATE_LINK_UNKNOWN)
+	if plan.ServiceName.IsUnknown() {
+		plan.ServiceName = types.StringValue("")
+	}
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
 	privateLinkInfo, err := common.TimeOutTask(r.client.CheckTimeOut, r.client.CheckInterval, func() (any, error) {
@@ -97,6 +104,12 @@ func (r *PrivateLinkResource) Create(ctx context.Context, req resource.CreateReq
 		if linkService != nil && linkService.Status == client.PRIVATE_LINK_READY {
 			return linkService, nil
 		}
+		if linkService != nil && client.IsProvisionFailed(linkService.Status) {
+			return linkService, common.Terminal(fmt.Errorf("private link provisioning failed, status: %s"+
+				" (check the region service logs for the cause)", linkService.Status))
+		}
+		// A rolled-back cloud workflow has been seen to leave the status at
+		// CREATING indefinitely, in which case only the timeout ends the wait.
 		return linkService, fmt.Errorf("status not ready")
 	})
 	if err != nil {
@@ -106,6 +119,24 @@ func (r *PrivateLinkResource) Create(ctx context.Context, req resource.CreateReq
 	pl, ok := privateLinkInfo.(*client.PrivateLinkService)
 	if !ok {
 		resp.Diagnostics.AddError("return type not privatelink", "type convert error")
+		return
+	}
+	// Principal whitelisting is not implemented by every cloud provider: the
+	// create succeeds but the principals are dropped, and the state we return
+	// then contradicts the plan. Terraform reports that as "element 0 has
+	// vanished. This is a bug in the provider", which sends people looking in
+	// the wrong place. Say what actually happened instead.
+	if len(plan.AllowPrincipals.Elements()) > 0 && (pl.AllowedPrincipals == nil || len(*pl.AllowedPrincipals) == 0) {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("allow_principals"),
+			"allow_principals is not supported by this deployment",
+			"The endpoint service was created, but the backend returned an empty principal list, "+
+				"so the principals in the configuration were silently dropped.\n\n"+
+				"This cloud provider does not implement PrivateLink principal whitelisting. "+
+				"Alibaba Cloud, for one, gates access by approving connections instead: the consumer "+
+				"creates the endpoint first, and you approve the pending connection in the console.\n\n"+
+				"Set allow_principals = [] to manage the endpoint service with Terraform.",
+		)
 		return
 	}
 	r.mapRelytToTFModel(nil, pl, &plan, &resp.Diagnostics)
@@ -134,8 +165,16 @@ func (r *PrivateLinkResource) Read(ctx context.Context, req resource.ReadRequest
 	retry, err := common.CommonRetry(ctx, func() (*client.PrivateLinkService, error) {
 		return r.client.GetPrivateLinkService(ctx, regionUri, dwsuId, state.ServiceType.ValueString())
 	})
-	if err != nil || retry == nil {
+	if err != nil {
 		resp.Diagnostics.AddError("error get private link", "get private link failed!"+err.Error())
+		return
+	}
+	if retry == nil {
+		// Gone from the backend: drop it from state instead of failing refresh,
+		// which would wedge plan, apply and destroy alike. Note the old code
+		// called err.Error() on this branch too, panicking whenever the service
+		// was simply absent rather than the request having failed.
+		resp.State.RemoveResource(ctx)
 		return
 	}
 	r.mapRelytToTFModel(ctx, retry, &state, &resp.Diagnostics)
@@ -273,7 +312,9 @@ func (r *PrivateLinkResource) mapRelytToTFModel(ctx context.Context, linkInfo *c
 			linkInfo.AllowedPrincipals = new([]string)
 		}
 		readPrincipal := true
-		if len(*linkInfo.AllowedPrincipals) == len(linkModel.AllowPrincipals.Elements()) {
+		// import 后 state 里 allow_principals 是 null，长度同样是 0；此时必须落一个真实的
+		// 空列表，否则 plan 会出现 null -> [] 的假 diff，触发阿里云不支持的 PATCH 调用
+		if !linkModel.AllowPrincipals.IsNull() && len(*linkInfo.AllowedPrincipals) == len(linkModel.AllowPrincipals.Elements()) {
 			//为了保持客户端顺序，这里从服务端读取后判断一下是否长度一样，内容一样。如果不是则发生过变动需要更新
 			set := map[string]bool{}
 			for _, p := range *linkInfo.AllowedPrincipals {

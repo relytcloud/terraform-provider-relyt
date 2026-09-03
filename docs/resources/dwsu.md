@@ -32,16 +32,16 @@ resource "relyt_dwsu" "dwsu" {
 
 ### Required
 
-- `cloud` (String) The ID of the cloud provider.
+- `cloud` (String) The ID of the cloud provider. Cannot be changed after creation; an update is rejected.
 - `default_dps` (Attributes) (see [below for nested schema](#nestedatt--default_dps))
-- `domain` (String) The domain name of the service unit.
-- `region` (String) The ID of the region.
+- `domain` (String) The domain name of the service unit. Cannot be changed after creation; an update is rejected.
+- `region` (String) The ID of the region. Cannot be changed after creation; an update is rejected.
 
 ### Optional
 
 - `alias` (String) The alias of the service unit.
-- `edition` (String) The ID of the edition.
-- `variant` (String) The variables.
+- `edition` (String) The ID of the edition. Cannot be changed after creation; an update is rejected.
+- `variant` (String) The variables. Cannot be changed after creation; an update is rejected.
 
 ### Read-Only
 

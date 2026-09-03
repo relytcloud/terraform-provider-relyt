@@ -45,12 +45,17 @@ func (r *dwUserResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 	resp.Schema = schema.Schema{
 		Version: 0,
 		Attributes: map[string]schema.Attribute{
-			"dwsu_id":                             schema.StringAttribute{Required: true, Description: "The ID of the service unit."},
-			"id":                                  schema.StringAttribute{Computed: true, Description: "The ID of the DW user.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
-			"account_name":                        schema.StringAttribute{Required: true, Description: "The name of the DW user, which is unique in the instance. The name is the email address."},
-			"account_password":                    schema.StringAttribute{Required: true, Description: "initPassword"},
-			"datalake_aws_lakeformation_role_arn": schema.StringAttribute{Optional: true, Description: "The ARN of the cross-account IAM role, optional."},
-			"async_query_result_location_prefix":  schema.StringAttribute{Optional: true, Description: "The prefix of the path to the S3 output location."},
+			"dwsu_id":          schema.StringAttribute{Required: true, Description: "The ID of the service unit."},
+			"id":               schema.StringAttribute{Computed: true, Description: "The ID of the DW user.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
+			"account_name":     schema.StringAttribute{Required: true, Description: "The name of the DW user, which is unique in the instance. The name is the email address."},
+			"account_password": schema.StringAttribute{Required: true, Description: "initPassword"},
+			// Computed so that omitting it from the configuration keeps whatever the
+			// server holds. On Alibaba Cloud this field stores the Unity Catalog user
+			// mapping (engine: set_user_role_arn), which an administrator sets out of
+			// band; without Computed, every apply that omits it would delete it.
+			// Set it to "" to remove the binding on purpose.
+			"datalake_aws_lakeformation_role_arn":      schema.StringAttribute{Optional: true, Computed: true, Description: "The ARN of the cross-account IAM role, optional. On Alibaba Cloud this holds the external lakehouse identity binding instead. Omit to leave the server value untouched; set to \"\" to remove it."},
+			"async_query_result_location_prefix":       schema.StringAttribute{Optional: true, Description: "The prefix of the path to the S3 output location."},
 			"async_query_result_location_aws_role_arn": schema.StringAttribute{Optional: true, Description: "The ARN of the role to access the output location, optional."},
 		},
 	}
@@ -84,26 +89,12 @@ func (r *dwUserResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 	dwUserModel.ID = types.StringValue(relytAccount.Name)
-	diags = resp.State.Set(ctx, &dwUserModel)
 	r.handleAccountConfig(ctx, &dwUserModel, regionUri, &resp.Diagnostics)
-	//if resp.Diagnostics.HasError() {
-	//这里注释掉主动回滚，应该由用户回滚
-	//err := r.client.DropAccount(ctx, regionUri, dwUserModel.DwsuId.ValueString(), dwUserModel.ID.ValueString())
-	//if err != nil {
-	//	resp.Diagnostics.AddError(
-	//		"Error rollback create dwuser",
-	//		"Could not rollback dwuser! please clear it with destroy or manual! userId: "+dwUserModel.ID.ValueString()+""+err.Error(),
-	//	)
-	//}
-	//}
-	if resp.Diagnostics.HasError() {
-		//如果有异常，dwuser不要写状态
-		return
-	}
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
+	// State goes in after handleAccountConfig so the normalized (never unknown)
+	// lakeformation value lands in it. Written even when the config calls failed:
+	// the account exists on the server, so dropping it from state orphans it.
+	// No rollback on failure: the account exists on the server, the user decides.
+	resp.Diagnostics.Append(resp.State.Set(ctx, &dwUserModel)...)
 }
 
 // Read resource information.
@@ -342,20 +333,14 @@ func (r *dwUserResource) handleAccountConfig(ctx context.Context, dwUserModel *t
 		)
 	}
 	if dwUserModel.DatalakeAwsLakeformationRoleArn.IsUnknown() {
+		// Optional+Computed with nothing configured. Nothing to write, but the
+		// attribute has to be known once apply finishes.
 		dwUserModel.DatalakeAwsLakeformationRoleArn = types.StringNull()
 	}
-	if !dwUserModel.DatalakeAwsLakeformationRoleArn.IsNull() {
-		_, err := common.CommonRetry[client.CommonRelytResponse[string]](ctx, func() (*client.CommonRelytResponse[string], error) {
-			return r.client.LakeFormationConfig(ctx, regionUri, dwUserModel.DwsuId.ValueString(), dwUserModel.ID.ValueString(), lakeFormation)
-		})
-		if err != nil {
-			diagnostics.AddError(
-				"Error config dwuser",
-				"Could not config dwuser lakeformation, unexpected error: "+err.Error(),
-			)
-			//return
-		}
-	} else if dwUserModel.DatalakeAwsLakeformationRoleArn.IsNull() {
+	switch lakeFormationActionFor(dwUserModel.DatalakeAwsLakeformationRoleArn) {
+	case lakeFormationSkip:
+		// leave the server value alone; Read fills state from it
+	case lakeFormationDelete:
 		_, err := common.CommonRetry[client.CommonRelytResponse[string]](ctx, func() (*client.CommonRelytResponse[string], error) {
 			return r.client.DeleteLakeFormationConfig(ctx, regionUri, dwUserModel.DwsuId.ValueString(), dwUserModel.ID.ValueString())
 		})
@@ -364,7 +349,41 @@ func (r *dwUserResource) handleAccountConfig(ctx context.Context, dwUserModel *t
 				"Error config dwuser",
 				"Could not delete dwuser lakeformation, unexpected error: "+err.Error(),
 			)
-			//return
 		}
+	case lakeFormationSet:
+		_, err := common.CommonRetry[client.CommonRelytResponse[string]](ctx, func() (*client.CommonRelytResponse[string], error) {
+			return r.client.LakeFormationConfig(ctx, regionUri, dwUserModel.DwsuId.ValueString(), dwUserModel.ID.ValueString(), lakeFormation)
+		})
+		if err != nil {
+			diagnostics.AddError(
+				"Error config dwuser",
+				"Could not config dwuser lakeformation, unexpected error: "+err.Error(),
+			)
+		}
+	}
+}
+
+type lakeFormationAction int
+
+const (
+	lakeFormationSkip lakeFormationAction = iota
+	lakeFormationDelete
+	lakeFormationSet
+)
+
+// lakeFormationActionFor decides what to do with the lakeformation binding for a
+// given configured value. An absent value means "don't touch the server", not
+// "delete": on Alibaba Cloud this field holds the Unity Catalog user mapping that
+// an administrator sets out of band (engine: set_user_role_arn), so deleting on
+// absence silently broke external schemas for anyone who left this AWS-named
+// field out of their configuration. Removing the binding takes an explicit "".
+func lakeFormationActionFor(roleArn types.String) lakeFormationAction {
+	switch {
+	case roleArn.IsNull() || roleArn.IsUnknown():
+		return lakeFormationSkip
+	case roleArn.ValueString() == "":
+		return lakeFormationDelete
+	default:
+		return lakeFormationSet
 	}
 }

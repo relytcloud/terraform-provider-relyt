@@ -28,7 +28,12 @@ func updateDps(ctx context.Context, relytClient *client.RelytClient, state, plan
 	if diagnostics.HasError() {
 		return
 	}
-	if dps.Spec == nil || (dps.Spec != nil && dps.Spec.Name != plan.Size.ValueString()) {
+	// Patch when the server spec differs from the plan, or when only the
+	// description changed. Guarding on size alone silently dropped a
+	// description-only edit, leaving a diff the user could never apply.
+	sizeDiffers := dps.Spec == nil || dps.Spec.Name != plan.Size.ValueString()
+	descriptionDiffers := dps.Description != plan.Description.ValueString()
+	if sizeDiffers || descriptionDiffers {
 		_, err := relytClient.PatchDps(ctx, regionUri, dwsuId, dpsId, patchDps)
 		if err != nil {
 			tflog.Error(ctx, "error update dps"+err.Error())
@@ -36,7 +41,7 @@ func updateDps(ctx context.Context, relytClient *client.RelytClient, state, plan
 			return
 		}
 	} else {
-		tflog.Warn(ctx, "skip patch! target already match plan size")
+		tflog.Warn(ctx, "skip patch! target already match plan size and description")
 	}
 	//读一下最新状态，写入Status，告诉用户正在变配。注意这时候不能写size，否则会导致TF认为已经是目标Size不再重入到Update逻辑
 	readDps(ctx, dwsuId, dpsId, relytClient, diagnostics, state)
@@ -53,6 +58,7 @@ func updateDps(ctx context.Context, relytClient *client.RelytClient, state, plan
 	//mapRelytDpsToTFModel(dps, state)
 	//更改成功，则将Size设置为目标Size
 	state.Size = plan.Size
+	state.Description = plan.Description
 }
 
 func readDps(ctx context.Context, dwsuId, dpsId string, r *client.RelytClient, diagnostics *diag.Diagnostics, dpsModel *model.Dps) *client.DpsMode {
@@ -110,6 +116,10 @@ func WaitDpsReady(ctx context.Context, relytClient *client.RelytClient, regionUr
 		}
 		if dps != nil && dps.Status == client.DPS_STATUS_READY {
 			return dps, nil
+		}
+		if dps != nil && client.IsProvisionFailed(dps.Status) {
+			return dps, common.Terminal(fmt.Errorf("dps provisioning failed, status: %s"+
+				" (check the region service logs for the cause)", dps.Status))
 		}
 		return dps, fmt.Errorf("dps is not Ready")
 	})
