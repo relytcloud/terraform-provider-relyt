@@ -14,12 +14,23 @@ description: |-
 
 ```terraform
 resource "relyt_dwuser" "user1" {
-  dwsu_id                                  = "dwsu-id-from-an-dwsu-resource"
-  account_name                             = "UniqueAccountName"
-  account_password                         = "daf#$dgdfe&Abce%64"
-  datalake_aws_lakeformation_role_arn      = "role arn arn=//xxxx"
-  async_query_result_location_prefix       = "s3=//bucket-name/prefix/..."
-  async_query_result_location_aws_role_arn = "role arn arn=//xxxx"
+  dwsu_id          = "dwsu-id-from-an-dwsu-resource"
+  account_name     = "user1@example.com"
+  account_password = "daf#$dgdfe&Abce%64"
+
+  # Identity used against the external data lake catalog.
+  #   AWS:           Lake Formation IAM role ARN, e.g. "arn:aws:iam::123456789012:role/lake-r1"
+  #   Alibaba Cloud: Unity Catalog user name,     e.g. "analyst@example.com"
+  # (replaces the deprecated datalake_aws_lakeformation_role_arn)
+  datalake_identity = "arn:aws:iam::123456789012:role/lake-r1"
+
+  # Asynchronous query results: s3:// prefix (also on Alibaba Cloud / OSS) plus the
+  # role the engine assumes to write there. Set both or neither.
+  #   AWS:           "arn:aws:iam::123456789012:role/async-results"
+  #   Alibaba Cloud: "acs:ram::1234567890123456:role/async-results"
+  # (replaces the deprecated async_query_result_location_aws_role_arn)
+  async_query_result_location_prefix   = "s3://bucket-name/prefix/"
+  async_query_result_location_role_arn = "arn:aws:iam::123456789012:role/async-results"
 }
 ```
 
@@ -34,9 +45,11 @@ resource "relyt_dwuser" "user1" {
 
 ### Optional
 
-- `async_query_result_location_aws_role_arn` (String) The ARN of the role to access the output location, optional.
-- `async_query_result_location_prefix` (String) The prefix of the path to the S3 output location.
-- `datalake_aws_lakeformation_role_arn` (String) The ARN of the cross-account IAM role, optional. On Alibaba Cloud this holds the external lakehouse identity binding instead. Omit to leave the server value untouched; set to "" to remove it.
+- `async_query_result_location_aws_role_arn` (String, Deprecated) Deprecated alias of `async_query_result_location_role_arn`, same value and behaviour.
+- `async_query_result_location_prefix` (String) Object storage location the engine writes asynchronous query results to, as `s3://<bucket>/<path>/`. Use the `s3://` form on Alibaba Cloud as well; the engine addresses OSS through it. Must be set together with `async_query_result_location_role_arn`; omitting both clears the setting.
+- `async_query_result_location_role_arn` (String) ARN of the role the engine assumes to write asynchronous query results into the prefix. AWS: an IAM role ARN, e.g. `arn:aws:iam::123456789012:role/async-results`. Alibaba Cloud: a RAM role ARN, e.g. `acs:ram::1234567890123456:role/async-results`, whose trust policy allows the Relyt platform identity with this DWSU's external ID. Must be set together with `async_query_result_location_prefix`; omitting both clears the setting. Replaces the deprecated `async_query_result_location_aws_role_arn`; configure only one of the two.
+- `datalake_aws_lakeformation_role_arn` (String, Deprecated) Deprecated alias of `datalake_identity`, same value and behaviour. Omit to leave the server value untouched; set to "" to remove the binding.
+- `datalake_identity` (String) The identity this DW user presents to the external data lake catalog. AWS: the ARN of the cross-account IAM role used with Lake Formation, e.g. `arn:aws:iam::123456789012:role/lake-r1`. Alibaba Cloud: the Unity Catalog user name to map this DW user to, e.g. `analyst@example.com`. Omit to leave the server value untouched; set to "" to remove the binding. Replaces the deprecated `datalake_aws_lakeformation_role_arn`; configure only one of the two.
 
 ### Read-Only
 
@@ -49,3 +62,8 @@ Using `terraform import`, import user using the `dwsu_id,account_name`. For exam
 ```
 terraform import relyt_dwuser.user-import 1234567890,user@zbyte-inc.com
 ```
+
+After import the state carries the async result role under `async_query_result_location_role_arn`
+and the data lake identity under both `datalake_identity` and its deprecated alias. A configuration
+that still uses `async_query_result_location_aws_role_arn` therefore shows one in-place update on
+its first plan; applying it re-sends the same value and the plan is clean afterwards.

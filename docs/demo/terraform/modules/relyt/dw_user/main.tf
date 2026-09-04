@@ -11,12 +11,12 @@ provider "relyt" {
 }
 
 resource "relyt_dwuser" "dw_user1" {
-  dwsu_id                                  = var.dwsu_id
-  account_name                             = var.account_name
-  account_password                         = var.account_password
-  datalake_aws_lakeformation_role_arn      = var.datalake_aws_lakeformation_role_arn
-  async_query_result_location_prefix       = var.async_query_result_location_prefix
-  async_query_result_location_aws_role_arn = var.async_query_result_location_aws_role_arn
+  dwsu_id                              = var.dwsu_id
+  account_name                         = var.account_name
+  account_password                     = var.account_password
+  datalake_identity                    = var.datalake_identity
+  async_query_result_location_prefix   = var.async_query_result_location_prefix
+  async_query_result_location_role_arn = var.async_query_result_location_role_arn
 }
 
 data "relyt_dwsu_boto3_access_info" "boto3" {

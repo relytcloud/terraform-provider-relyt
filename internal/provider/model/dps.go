@@ -65,12 +65,22 @@ type DpsModel struct {
 }
 
 type DWUserModel struct {
-	DwsuId                             types.String `tfsdk:"dwsu_id"`
-	ID                                 types.String `tfsdk:"id"`
-	AccountName                        types.String `tfsdk:"account_name"`
-	AccountPassword                    types.String `tfsdk:"account_password"`
-	DatalakeAwsLakeformationRoleArn    types.String `tfsdk:"datalake_aws_lakeformation_role_arn"`
+	DwsuId          types.String `tfsdk:"dwsu_id"`
+	ID              types.String `tfsdk:"id"`
+	AccountName     types.String `tfsdk:"account_name"`
+	AccountPassword types.String `tfsdk:"account_password"`
+	// Identity used against the external data lake catalog. Cloud-neutral name;
+	// on AWS it is a Lake Formation IAM role ARN, on Alibaba Cloud a Unity
+	// Catalog user name. DatalakeAwsLakeformationRoleArn is the deprecated alias
+	// that carries the same value for existing configurations.
+	DatalakeIdentity                types.String `tfsdk:"datalake_identity"`
+	DatalakeAwsLakeformationRoleArn types.String `tfsdk:"datalake_aws_lakeformation_role_arn"`
+	// Asynchronous query result location: an s3:// prefix plus the role the
+	// engine assumes to write there (IAM role on AWS, RAM role on Alibaba Cloud).
+	// AsyncQueryResultLocationAwsRoleArn is the deprecated alias of
+	// AsyncQueryResultLocationRoleArn.
 	AsyncQueryResultLocationPrefix     types.String `tfsdk:"async_query_result_location_prefix"`
+	AsyncQueryResultLocationRoleArn    types.String `tfsdk:"async_query_result_location_role_arn"`
 	AsyncQueryResultLocationAwsRoleArn types.String `tfsdk:"async_query_result_location_aws_role_arn"`
 	//LastUpdated                        types.String `tfsdk:"last_updated"`
 	//Status                             types.String `tfsdk:"status"`

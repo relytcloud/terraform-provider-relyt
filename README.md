@@ -60,9 +60,9 @@
     
     
     # Other optional parameters
-      datalake_aws_lakeformation_role_arn = "anotherRole2" # The ARN of the cross-account IAM role.
-      async_query_result_location_prefix  = "simple"       # The prefix of the path to the S3 output location.
-      async_query_result_location_aws_role_arn = "anotherSimple" # The ARN of the role to access the output location.
+      datalake_identity                    = "arn:aws:iam::123456789012:role/lake-r1"        # Data lake identity: IAM role ARN on AWS, Unity Catalog user name on Alibaba Cloud.
+      async_query_result_location_prefix   = "s3://bucket-name/prefix/"                       # s3:// prefix for async query results (also on Alibaba Cloud / OSS).
+      async_query_result_location_role_arn = "arn:aws:iam::123456789012:role/async-results"  # Role the engine assumes to write there: IAM role on AWS, RAM role (acs:ram::...) on Alibaba Cloud.
     }
     
     

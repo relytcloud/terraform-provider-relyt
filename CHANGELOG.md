@@ -1,3 +1,35 @@
+## 1.6.0 (Unreleased)
+
+FEATURES:
+
+* Non-AWS deployments: `api_host` routes to any Relyt control plane, region
+  endpoints are discovered per cloud, and Alibaba Cloud is supported end to end
+  (#14, #15, re-landed in #19).
+
+IMPROVEMENTS:
+
+* `relyt_dwuser`: cloud-neutral names for the two attributes that carried AWS
+  vocabulary but are used on every cloud. The old names keep working as
+  deprecated aliases; configure one name or the other, not both (#21).
+
+  | Deprecated name                              | Use instead                             |
+  | :------------------------------------------- | :-------------------------------------- |
+  | `datalake_aws_lakeformation_role_arn`        | `datalake_identity`                     |
+  | `async_query_result_location_aws_role_arn`   | `async_query_result_location_role_arn`  |
+
+  On AWS `datalake_identity` is the Lake Formation IAM role ARN and the async role
+  is an IAM role ARN; on Alibaba Cloud they are the Unity Catalog user name and a
+  RAM role ARN (`acs:ram::<account>:role/<name>`). `async_query_result_location_prefix`
+  stays `s3://…` on both clouds.
+* `relyt_dwuser`: descriptions now state what to fill in on AWS and on Alibaba Cloud.
+
+NOTES:
+
+* Switching an existing configuration from a deprecated name to the new one is a
+  no-op plan for `datalake_identity`. For the async role it shows a one-time
+  in-place update that re-sends the same value; imported users default to the new
+  name in state.
+
 ## 1.5.1 (May 21, 2026)
 
 FEATURES:

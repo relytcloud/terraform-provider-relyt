@@ -21,20 +21,20 @@ variable "account_password" {
   description = "Account password"
 }
 
-variable "datalake_aws_lakeformation_role_arn" {
+variable "datalake_identity" {
   type        = string
   default     = "arn:aws:iam::905418298243:role/lake-r1"
-  description = "Datalake AWS lakeformation role arn"
+  description = "Identity used against the external data lake catalog: Lake Formation IAM role ARN on AWS, Unity Catalog user name on Alibaba Cloud"
 }
 
 variable "async_query_result_location_prefix" {
   type        = string
   default     = "s3://relytqaresult-us-east-1/user1/result1/"
-  description = "Async query result location prefix"
+  description = "s3:// prefix the engine writes async query results to (also s3:// on Alibaba Cloud / OSS)"
 }
 
-variable "async_query_result_location_aws_role_arn" {
+variable "async_query_result_location_role_arn" {
   type        = string
   default     = "arn:aws:iam::905418298243:role/lake-r1"
-  description = "Async query result location aws role arn"
+  description = "Role the engine assumes to write async query results: IAM role ARN on AWS, RAM role ARN (acs:ram::...) on Alibaba Cloud"
 }
