@@ -19,9 +19,13 @@ import (
 
 // Ensure the implementation satisfies the expected interfaces.
 var (
-	_ resource.Resource                   = &dwUserResource{}
-	_ resource.ResourceWithConfigure      = &dwUserResource{}
-	_ resource.ResourceWithImportState    = &dwUserResource{}
+	_ resource.Resource                = &dwUserResource{}
+	_ resource.ResourceWithConfigure   = &dwUserResource{}
+	_ resource.ResourceWithImportState = &dwUserResource{}
+)
+
+// Alias handling for the cloud-neutral attribute names, see ValidateConfig and ModifyPlan.
+var (
 	_ resource.ResourceWithValidateConfig = &dwUserResource{}
 	_ resource.ResourceWithModifyPlan     = &dwUserResource{}
 )
@@ -51,56 +55,25 @@ func (r *dwUserResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 			"id":               schema.StringAttribute{Computed: true, Description: "The ID of the DW user.", PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()}},
 			"account_name":     schema.StringAttribute{Required: true, Description: "The name of the DW user, which is unique in the instance. The name is the email address."},
 			"account_password": schema.StringAttribute{Required: true, Description: "initPassword"},
-			// datalake_identity / datalake_aws_lakeformation_role_arn are one value
-			// under two names. The cloud-neutral name is the one to use; the AWS-named
-			// one stays as a deprecated alias so existing configurations keep working.
-			// Both are Optional+Computed so that omitting them from the configuration
-			// keeps whatever the server holds. On Alibaba Cloud this field stores the
-			// Unity Catalog user mapping (engine: set_user_role_arn), which an
-			// administrator may set out of band; without Computed, every apply that
-			// omits it would delete it. Set it to "" to remove the binding on purpose.
-			// Whichever name is configured, Read writes the server value into both, so
-			// switching a configuration from the old name to the new one is a no-op plan.
-			"datalake_identity": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
-				Description: "The identity this DW user presents to the external data lake catalog. " +
-					"AWS: the ARN of the cross-account IAM role used with Lake Formation, e.g. `arn:aws:iam::123456789012:role/lake-r1`. " +
-					"Alibaba Cloud: the Unity Catalog user name to map this DW user to, e.g. `analyst@example.com`. " +
-					"Omit to leave the server value untouched; set to \"\" to remove the binding. " +
-					"Replaces the deprecated `datalake_aws_lakeformation_role_arn`; configure only one of the two.",
-			},
-			"datalake_aws_lakeformation_role_arn": schema.StringAttribute{
-				Optional:           true,
-				Computed:           true,
-				DeprecationMessage: "Use `datalake_identity` instead. This AWS-named attribute is kept as an alias for existing configurations and will be removed in a future major release.",
-				Description:        "Deprecated alias of `datalake_identity`, same value and behaviour. Omit to leave the server value untouched; set to \"\" to remove the binding.",
-			},
-			// async_query_result_location_prefix and the role are one setting: both must be
-			// present to configure it, and omitting both clears it on the server. The
-			// role again has a cloud-neutral name plus a deprecated AWS-named alias.
-			// These are not Computed on purpose: "omitted" must stay visible in the plan
-			// because it means "clear the server setting", and the value has no
-			// server-side default to keep.
-			"async_query_result_location_prefix": schema.StringAttribute{
-				Optional: true,
-				Description: "Object storage location the engine writes asynchronous query results to, as `s3://<bucket>/<path>/`. " +
-					"Use the `s3://` form on Alibaba Cloud as well; the engine addresses OSS through it. " +
-					"Must be set together with `async_query_result_location_role_arn`; omitting both clears the setting.",
-			},
-			"async_query_result_location_role_arn": schema.StringAttribute{
-				Optional: true,
-				Description: "ARN of the role the engine assumes to write asynchronous query results into the prefix. " +
-					"AWS: an IAM role ARN, e.g. `arn:aws:iam::123456789012:role/async-results`. " +
-					"Alibaba Cloud: a RAM role ARN, e.g. `acs:ram::1234567890123456:role/async-results`, whose trust policy allows the Relyt platform identity with this DWSU's external ID. " +
-					"Must be set together with `async_query_result_location_prefix`; omitting both clears the setting. " +
-					"Replaces the deprecated `async_query_result_location_aws_role_arn`; configure only one of the two.",
-			},
-			"async_query_result_location_aws_role_arn": schema.StringAttribute{
-				Optional:           true,
-				DeprecationMessage: "Use `async_query_result_location_role_arn` instead. This AWS-named attribute is kept as an alias for existing configurations and will be removed in a future major release.",
-				Description:        "Deprecated alias of `async_query_result_location_role_arn`, same value and behaviour.",
-			},
+			// datalake_identity and datalake_aws_lakeformation_role_arn are one value under
+			// two names: the cloud-neutral name is the one to use, the AWS-named one stays
+			// as a deprecated alias so existing configurations keep working. Both are
+			// Computed so that omitting them from the configuration keeps whatever the
+			// server holds. On Alibaba Cloud this field stores the Unity Catalog user
+			// mapping (engine: set_user_role_arn), which an administrator sets out of
+			// band; without Computed, every apply that omits it would delete it.
+			// Set it to "" to remove the binding on purpose. Read writes the server
+			// value into both names, so switching a configuration from the old name to
+			// the new one is a no-op plan.
+			// The async result role also has a cloud-neutral name plus a deprecated
+			// AWS-named alias. Prefix and role are one setting: both must be present to
+			// configure it, and omitting both clears it on the server, so they are not
+			// Computed ("omitted" has to stay visible in the plan).
+			"datalake_identity":                        schema.StringAttribute{Optional: true, Computed: true, Description: "The identity this DW user presents to the external data lake catalog. AWS: the ARN of the cross-account IAM role used with Lake Formation, e.g. `arn:aws:iam::123456789012:role/lake-r1`. Alibaba Cloud: the Unity Catalog user name to map this DW user to, e.g. `analyst@example.com`. Omit to leave the server value untouched; set to \"\" to remove the binding. Replaces the deprecated `datalake_aws_lakeformation_role_arn`; configure only one of the two."},
+			"datalake_aws_lakeformation_role_arn":      schema.StringAttribute{Optional: true, Computed: true, DeprecationMessage: "Use `datalake_identity` instead. This AWS-named attribute is kept as an alias for existing configurations and will be removed in a future major release.", Description: "Deprecated alias of `datalake_identity`, same value and behaviour. Omit to leave the server value untouched; set to \"\" to remove the binding."},
+			"async_query_result_location_prefix":       schema.StringAttribute{Optional: true, Description: "The prefix of the path to the S3 output location."},
+			"async_query_result_location_role_arn":     schema.StringAttribute{Optional: true, Description: "ARN of the role the engine assumes to write asynchronous query results into the prefix. AWS: an IAM role ARN, e.g. `arn:aws:iam::123456789012:role/async-results`. Alibaba Cloud: a RAM role ARN, e.g. `acs:ram::1234567890123456:role/async-results`, whose trust policy allows the Relyt platform identity with this DWSU's external ID. Must be set together with `async_query_result_location_prefix`; omitting both clears the setting. Replaces the deprecated `async_query_result_location_aws_role_arn`; configure only one of the two."},
+			"async_query_result_location_aws_role_arn": schema.StringAttribute{Optional: true, DeprecationMessage: "Use `async_query_result_location_role_arn` instead. This AWS-named attribute is kept as an alias for existing configurations and will be removed in a future major release.", Description: "Deprecated alias of `async_query_result_location_role_arn`, same value and behaviour."},
 		},
 	}
 }
@@ -409,6 +382,14 @@ func (r *dwUserResource) ImportState(ctx context.Context, req resource.ImportSta
 // plan (what state must end up as); cfg is the raw configuration, consulted to
 // learn which of the aliased attribute names the user actually wrote.
 func (r *dwUserResource) handleAccountConfig(ctx context.Context, dwUserModel *tfModel.DWUserModel, cfg *tfModel.DWUserModel, regionUri string, diagnostics *diag.Diagnostics) {
+	//dwUserModel.ID = dwUserModel.AccountName
+	tflog.Info(ctx, fmt.Sprintf("=======uknown %t nil %t", dwUserModel.AsyncQueryResultLocationAwsRoleArn.IsUnknown(), dwUserModel.AsyncQueryResultLocationAwsRoleArn.IsNull()))
+	//if dwUserModel.AsyncQueryResultLocationPrefix.IsUnknown() {
+	//	dwUserModel.AsyncQueryResultLocationPrefix = types.StringNull()
+	//}
+	//if dwUserModel.AsyncQueryResultLocationAwsRoleArn.IsUnknown() {
+	//	dwUserModel.AsyncQueryResultLocationAwsRoleArn = types.StringNull()
+	//}
 	// --- async query result location: prefix + role, one setting under two role names ---
 	roleVal, roleSet, err := pickAlias(cfg.AsyncQueryResultLocationRoleArn, cfg.AsyncQueryResultLocationAwsRoleArn)
 	if err != nil {
@@ -430,6 +411,7 @@ func (r *dwUserResource) handleAccountConfig(ctx context.Context, dwUserModel *t
 				"Error config dwuser",
 				"Could not config dwuser async, unexpected error: "+err.Error(),
 			)
+			//return
 		}
 		dwUserModel.AsyncQueryResultLocationPrefix = prefix
 		applyAsyncRoleState(dwUserModel, cfg, roleVal)
@@ -443,6 +425,7 @@ func (r *dwUserResource) handleAccountConfig(ctx context.Context, dwUserModel *t
 				"Error config dwuser",
 				"Could not drop dwuser async config, unexpected error: "+err.Error(),
 			)
+			//return
 		}
 		dwUserModel.AsyncQueryResultLocationPrefix = types.StringNull()
 		dwUserModel.AsyncQueryResultLocationRoleArn = types.StringNull()
@@ -478,7 +461,7 @@ func (r *dwUserResource) handleAccountConfig(ctx context.Context, dwUserModel *t
 	lakeFormation := client.LakeFormation{IAMRole: lfVal.ValueString()}
 	switch lakeFormationActionFor(lfVal) {
 	case lakeFormationSkip:
-		// unreachable once lfSet is true; kept for symmetry with lakeFormationActionFor
+		// leave the server value alone; Read fills state from it
 	case lakeFormationDelete:
 		_, err := common.CommonRetry[client.CommonRelytResponse[string]](ctx, func() (*client.CommonRelytResponse[string], error) {
 			return r.client.DeleteLakeFormationConfig(ctx, regionUri, dwUserModel.DwsuId.ValueString(), dwUserModel.ID.ValueString())

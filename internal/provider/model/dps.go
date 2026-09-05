@@ -64,21 +64,19 @@ type DpsModel struct {
 	//Status      types.String `tfsdk:"status"`
 }
 
+// DWUserModel is the plan/state model of relyt_dwuser. DatalakeIdentity (Lake
+// Formation IAM role ARN on AWS, Unity Catalog user name on Alibaba Cloud) and
+// AsyncQueryResultLocationRoleArn (IAM role on AWS, RAM role on Alibaba Cloud) are
+// the cloud-neutral names; DatalakeAwsLakeformationRoleArn and
+// AsyncQueryResultLocationAwsRoleArn are their deprecated aliases and carry the
+// same values for existing configurations.
 type DWUserModel struct {
-	DwsuId          types.String `tfsdk:"dwsu_id"`
-	ID              types.String `tfsdk:"id"`
-	AccountName     types.String `tfsdk:"account_name"`
-	AccountPassword types.String `tfsdk:"account_password"`
-	// Identity used against the external data lake catalog. Cloud-neutral name;
-	// on AWS it is a Lake Formation IAM role ARN, on Alibaba Cloud a Unity
-	// Catalog user name. DatalakeAwsLakeformationRoleArn is the deprecated alias
-	// that carries the same value for existing configurations.
-	DatalakeIdentity                types.String `tfsdk:"datalake_identity"`
-	DatalakeAwsLakeformationRoleArn types.String `tfsdk:"datalake_aws_lakeformation_role_arn"`
-	// Asynchronous query result location: an s3:// prefix plus the role the
-	// engine assumes to write there (IAM role on AWS, RAM role on Alibaba Cloud).
-	// AsyncQueryResultLocationAwsRoleArn is the deprecated alias of
-	// AsyncQueryResultLocationRoleArn.
+	DwsuId                             types.String `tfsdk:"dwsu_id"`
+	ID                                 types.String `tfsdk:"id"`
+	AccountName                        types.String `tfsdk:"account_name"`
+	AccountPassword                    types.String `tfsdk:"account_password"`
+	DatalakeIdentity                   types.String `tfsdk:"datalake_identity"`
+	DatalakeAwsLakeformationRoleArn    types.String `tfsdk:"datalake_aws_lakeformation_role_arn"`
 	AsyncQueryResultLocationPrefix     types.String `tfsdk:"async_query_result_location_prefix"`
 	AsyncQueryResultLocationRoleArn    types.String `tfsdk:"async_query_result_location_role_arn"`
 	AsyncQueryResultLocationAwsRoleArn types.String `tfsdk:"async_query_result_location_aws_role_arn"`

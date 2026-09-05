@@ -30,7 +30,7 @@ variable "datalake_identity" {
 variable "async_query_result_location_prefix" {
   type        = string
   default     = "s3://relytqaresult-us-east-1/user1/result1/"
-  description = "s3:// prefix the engine writes async query results to (also s3:// on Alibaba Cloud / OSS)"
+  description = "Async query result location prefix"
 }
 
 variable "async_query_result_location_role_arn" {

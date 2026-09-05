@@ -7,7 +7,7 @@ terraform {
 }
 
 provider "relyt" {
-  role     = var.role
+  role = var.role
 }
 
 resource "relyt_dwuser" "dw_user1" {
