@@ -39,15 +39,20 @@ tag 名必须是合法 semver（`v1.6.0-rc1`、`v1.6.0-pre` 都可以）。注�
 推送后 GitHub Actions 会构建并发布，产物应为 16 个附件：13 个平台 zip、
 `SHA256SUMS`、`SHA256SUMS.sig`、`manifest.json`。
 
-**不要把 rc 发成 GitHub pre-release。** Registry 只收录普通 release：2026-09 的
-`v1.6.0-rc1`～`rc3` 因为 `.goreleaser.yml` 当时配了 `release.prerelease: auto` 被标成
-pre-release，签名、附件都正常却一直没上架；把 rc4 的 pre-release 标记去掉后约 1 分钟就
-收录了。现在 `.goreleaser.yml` 改用 `release.make_latest`（带 `-` 的 tag 为 `false`），
-rc 以普通 release 发布、能进 registry，同时**不会顶掉 "Latest release" 指针**。
+`.goreleaser.yml` 里配置了 `release.prerelease: auto`，所以带 `-` 的 tag 会被自动
+标记为 GitHub pre-release。这有两个效果，都是有意的：**不会顶掉 "Latest release" 指针**，
+并且 **registry 不会收录**（registry 只收普通 release）。
 
-已经发成 pre-release 的 rc 要补救：在 GitHub release 页面取消 "Set as a pre-release"
-（或 `PATCH /repos/{owner}/{repo}/releases/{id}` 传 `prerelease=false`、`make_latest=false`），
-registry 随后会自动收录。
+**不要为了让 rc 上 registry 而去掉 pre-release 标记。** registry 把已收录的最高版本当作
+provider 的默认版本，预发布版也算：2026-09-07 把 `v1.6.0-rc4` 的 pre-release 标记去掉后，
+registry 约 1 分钟就收录了它，并立刻把 provider 页面的默认版本切成 `1.6.0-rc4`；之后把标记
+改回 pre-release 也不会撤下，registry 只在收录时看标记。2024 年的 `0.0.5-pre`、`1.0.1-pre`
+就是这样进的 registry，当天被正式版盖过去才没人注意。
+
+所以 rc 只发布到 GitHub release，测试时用 release 附件里的 zip 走 Terraform 的
+`filesystem_mirror`（`provider_installation { filesystem_mirror { path = "…" } }`，zip 按
+`registry.terraform.io/relytcloud/relyt/terraform-provider-relyt_<ver>_<os>_<arch>.zip` 摆放），
+`version` 精确 pin 到 rc 版本号。
 
 ### 关于 rc 版本的安装
 
