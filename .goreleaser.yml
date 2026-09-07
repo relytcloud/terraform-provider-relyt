@@ -52,9 +52,11 @@ signs:
       - "--detach-sign"
       - "${artifact}"
 release:
-  # Mark tags containing a hyphen (v1.5.1-pre, v2.0.0-rc1) as GitHub pre-releases
-  # so they do not take over the "Latest release" pointer.
-  prerelease: auto
+  # Tags containing a hyphen (v1.6.0-rc1, v1.6.0-pre) must NOT be published as
+  # GitHub pre-releases: the Terraform Registry only ingests regular releases,
+  # so every rc published with `prerelease: auto` was missing from the registry
+  # (1.6.0-rc1 to rc3). Keep them off the "Latest release" pointer instead.
+  make_latest: '{{ if .Prerelease }}false{{ else }}true{{ end }}'
   extra_files:
     - glob: 'terraform-registry-manifest.json'
       name_template: '{{ .ProjectName }}_{{ .Version }}_manifest.json'

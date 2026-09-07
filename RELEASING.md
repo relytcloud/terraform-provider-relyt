@@ -39,9 +39,15 @@ tag 名必须是合法 semver（`v1.6.0-rc1`、`v1.6.0-pre` 都可以）。注�
 推送后 GitHub Actions 会构建并发布，产物应为 16 个附件：13 个平台 zip、
 `SHA256SUMS`、`SHA256SUMS.sig`、`manifest.json`。
 
-`.goreleaser.yml` 里配置了 `release.prerelease: auto`，所以带 `-` 的 tag 会被自动
-标记为 GitHub pre-release，**不会顶掉 "Latest release" 指针**。这不影响 registry
-收录——预发布版同样会上架。
+**不要把 rc 发成 GitHub pre-release。** Registry 只收录普通 release：2026-09 的
+`v1.6.0-rc1`～`rc3` 因为 `.goreleaser.yml` 当时配了 `release.prerelease: auto` 被标成
+pre-release，签名、附件都正常却一直没上架；把 rc4 的 pre-release 标记去掉后约 1 分钟就
+收录了。现在 `.goreleaser.yml` 改用 `release.make_latest`（带 `-` 的 tag 为 `false`），
+rc 以普通 release 发布、能进 registry，同时**不会顶掉 "Latest release" 指针**。
+
+已经发成 pre-release 的 rc 要补救：在 GitHub release 页面取消 "Set as a pre-release"
+（或 `PATCH /repos/{owner}/{repo}/releases/{id}` 传 `prerelease=false`、`make_latest=false`），
+registry 随后会自动收录。
 
 ### 关于 rc 版本的安装
 

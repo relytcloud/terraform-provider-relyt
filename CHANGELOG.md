@@ -25,6 +25,10 @@ IMPROVEMENTS:
 
 NOTES:
 
+* Release tooling: rc tags are published as regular GitHub releases again (kept
+  off the "Latest release" pointer via `make_latest`), because the Terraform
+  Registry does not ingest releases flagged as pre-release. `1.6.0-rc1` to `rc3`
+  never reached the registry for that reason; `1.6.0-rc4` was re-flagged by hand.
 * Switching an existing configuration from a deprecated name to the new one is a
   no-op plan for `datalake_identity`. For the async role it shows a one-time
   in-place update that re-sends the same value; imported users default to the new
