@@ -23,6 +23,13 @@ IMPROVEMENTS:
   stays `s3://…` on both clouds.
 * `relyt_dwuser`: descriptions now state what to fill in on AWS and on Alibaba Cloud.
 
+BUG FIXES:
+
+* `relyt_dwsu_external_schema`: `table_format` no longer reports drift on every
+  plan. The service stores the value lower-cased; `Read` now keeps the spelling
+  in state when the two differ only in case, and a configuration change that
+  differs only in case is not planned as a change (#23).
+
 NOTES:
 
 * Switching an existing configuration from a deprecated name to the new one is a

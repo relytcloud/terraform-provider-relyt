@@ -46,7 +46,7 @@ func (r *DwsuExternalSchemaResource) Schema(_ context.Context, _ resource.Schema
 			"name":         schema.StringAttribute{Required: true, Description: "The name of the external schema. The schema name must be consistent with the name of the target schema that exists in the external catalog.\nNote that the combined length of the catalog and schema values must not exceed 127 characters."},
 			"catalog":      schema.StringAttribute{Required: true, Description: "The name of the catalog.\nNote that the combined length of the catalog and schema values must not exceed 127 characters."},
 			"database":     schema.StringAttribute{Required: true, Description: "The name of the database."},
-			"table_format": schema.StringAttribute{Required: true, Description: "table_format", PlanModifiers: []planmodifier.String{modifier.GetStringIgnoreCaseModifier()}},
+			"table_format": schema.StringAttribute{Required: true, Description: "The table format of the external schema, e.g. `DELTA`. Case-insensitive: the service stores it lower-cased and the provider keeps the spelling you configured, so a value that differs only in case is not a change.", PlanModifiers: []planmodifier.String{modifier.GetStringIgnoreCaseModifier()}},
 			//"table_format": schema.StringAttribute{Required: true, Description: "table_format"},
 			"properties": schema.MapAttribute{
 				ElementType: types.StringType,
@@ -123,7 +123,13 @@ func (r *DwsuExternalSchemaResource) Read(ctx context.Context, req resource.Read
 	} else {
 		externalSchema.Properties = *getExternalSchema.Properties
 	}
-	externalSchema.TableFormat = types.StringPointerValue(getExternalSchema.TableFormat)
+	// The service stores table_format lower-cased. Keep the spelling already in
+	// state when the two only differ in case, otherwise every refresh rewrites
+	// state and reports drift for a value nobody changed (#23). A missing prior
+	// value (import) and a real change take the server value.
+	if got := getExternalSchema.TableFormat; got == nil || externalSchema.TableFormat.IsNull() || !strings.EqualFold(*got, externalSchema.TableFormat.ValueString()) {
+		externalSchema.TableFormat = types.StringPointerValue(got)
+	}
 
 	resp.State.Set(ctx, &externalSchema)
 }
