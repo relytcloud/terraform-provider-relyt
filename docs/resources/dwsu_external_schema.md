@@ -38,4 +38,4 @@ Note that the combined length of the catalog and schema values must not exceed 1
 - `name` (String) The name of the external schema. The schema name must be consistent with the name of the target schema that exists in the external catalog.
 Note that the combined length of the catalog and schema values must not exceed 127 characters.
 - `properties` (Map of String) The properties of the schema.
-- `table_format` (String) table_format
+- `table_format` (String) The table format of the external schema, e.g. `DELTA`. Case-insensitive: the service stores it lower-cased and the provider keeps the spelling you configured, so a value that differs only in case is not a change.
