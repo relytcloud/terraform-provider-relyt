@@ -32,6 +32,12 @@ BUG FIXES:
 
 NOTES:
 
+* Release process: rc tags stay GitHub pre-releases on purpose and are not
+  published to the Terraform Registry. The registry only ingests regular
+  releases, and it treats the highest ingested version as the provider's default
+  even when it is a pre-release; `1.6.0-rc4` briefly became the registry default
+  on 2026-09-07 after its pre-release flag was removed by hand. Test rc builds
+  from the GitHub release assets through a filesystem mirror (see RELEASING.md).
 * Switching an existing configuration from a deprecated name to the new one is a
   no-op plan for `datalake_identity`. For the async role it shows a one-time
   in-place update that re-sends the same value; imported users default to the new
