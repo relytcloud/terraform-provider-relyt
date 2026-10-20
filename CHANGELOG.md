@@ -1,3 +1,21 @@
+## 1.7.0 (Unreleased)
+
+FEATURES:
+
+* `relyt_dwsu_privatelink`: new read-only `zones` attribute, the availability
+  zones the endpoint service has backends in (#27). On Alibaba Cloud the
+  consumer's endpoint may only be created in a zone the service has a backend
+  in, so this is what feeds `zone_id` of `alicloud_privatelink_vpc_endpoint`;
+  until now the value had to be obtained out of band for every service unit.
+  The list is empty against a control plane that does not report zones, so
+  existing configurations are unaffected.
+
+IMPROVEMENTS:
+
+* `relyt_dwsu_privatelink`: `allow_principals` now says what the value is on
+  each cloud, an IAM principal ARN (or `*`) on AWS and the consumer's main
+  account UID on Alibaba Cloud, and the example shows both (#28).
+
 ## 1.6.0 (September 10, 2026)
 
 FEATURES:

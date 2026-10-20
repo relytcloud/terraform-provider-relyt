@@ -7,6 +7,7 @@ type PrivateLinkModel struct {
 	ServiceType     types.String `tfsdk:"service_type"`
 	ServiceName     types.String `tfsdk:"service_name"`
 	Status          types.String `tfsdk:"status"`
+	Zones           types.List   `tfsdk:"zones"`
 	AllowPrincipals types.List   `tfsdk:"allow_principals"`
 }
 

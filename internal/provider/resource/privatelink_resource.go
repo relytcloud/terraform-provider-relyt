@@ -45,10 +45,17 @@ func (r *PrivateLinkResource) Schema(_ context.Context, _ resource.SchemaRequest
 			"service_type": schema.StringAttribute{Required: true, Description: "(database | data_api | web_console)"},
 			"service_name": schema.StringAttribute{Computed: true},
 			"status":       schema.StringAttribute{Computed: true},
+			"zones": schema.ListAttribute{ElementType: types.StringType, Computed: true,
+				Description: "The availability zones the endpoint service has backends in. On Alibaba Cloud " +
+					"the consumer endpoint can only be created in one of these zones, so this is what feeds " +
+					"zone_id of alicloud_privatelink_vpc_endpoint. Empty where the deployment does not report zones."},
 			"allow_principals": schema.ListNestedAttribute{
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
-						"principal": schema.StringAttribute{Required: true, Description: "principal"},
+						"principal": schema.StringAttribute{Required: true,
+							Description: "Who may connect to the endpoint service. On AWS an IAM principal ARN, " +
+								"or * for everyone. On Alibaba Cloud the account whitelist takes the consumer's " +
+								"main account UID, digits only."},
 					},
 				},
 				Required: true, Description: "allow principal"},
@@ -93,6 +100,9 @@ func (r *PrivateLinkResource) Create(ctx context.Context, req resource.CreateReq
 	plan.Status = types.StringValue(client.PRIVATE_LINK_UNKNOWN)
 	if plan.ServiceName.IsUnknown() {
 		plan.ServiceName = types.StringValue("")
+	}
+	if plan.Zones.IsUnknown() {
+		plan.Zones = types.ListValueMust(types.StringType, []attr.Value{})
 	}
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -139,7 +149,9 @@ func (r *PrivateLinkResource) Create(ctx context.Context, req resource.CreateReq
 		)
 		return
 	}
-	r.mapRelytToTFModel(nil, pl, &plan, &resp.Diagnostics)
+	// ctx, not nil: converting the zones list goes through reflection, which
+	// takes the context.
+	r.mapRelytToTFModel(ctx, pl, &plan, &resp.Diagnostics)
 	diags = resp.State.Set(ctx, plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -305,6 +317,15 @@ func (r *PrivateLinkResource) mapRelytToTFModel(ctx context.Context, linkInfo *c
 	if linkInfo != nil && linkModel != nil {
 		linkModel.Status = types.StringValue(linkInfo.Status)
 		linkModel.ServiceName = types.StringValue(linkInfo.ServiceName)
+		// Before the principal branch below, which returns early: zones has to be
+		// set on every path, a deployment that does not report them included.
+		zones := []string{}
+		if linkInfo.Zones != nil {
+			zones = *linkInfo.Zones
+		}
+		zoneList, zoneDiags := types.ListValueFrom(ctx, types.StringType, zones)
+		diagnostic.Append(zoneDiags...)
+		linkModel.Zones = zoneList
 		objectType := types.ObjectType{AttrTypes: map[string]attr.Type{
 			"principal": types.StringType,
 		}}
