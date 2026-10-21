@@ -205,6 +205,10 @@ type PrivateLinkService struct {
 	ServiceName       string    `json:"serviceName,omitempty"`
 	ServiceType       string    `json:"serviceType,omitempty"`
 	Status            string    `json:"status,omitempty"`
+	// Zones is read-only: the availability zones the endpoint service has
+	// backends in. Absent from the response on control planes that do not
+	// report it yet.
+	Zones *[]string `json:"zones,omitempty"`
 }
 
 type IntegrationInfo struct {

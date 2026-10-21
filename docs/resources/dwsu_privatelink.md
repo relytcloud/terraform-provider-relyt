@@ -13,12 +13,36 @@ description: |-
 ## Example Usage
 
 ```terraform
+# On AWS a principal is an IAM principal ARN, or "*" for every account.
 resource "relyt_dwsu_privatelink" "privatelink" {
   dwsu_id      = "dwsu-id-from-an-duws-resource"
-  service_type = "private link target service type"
+  service_type = "database"
   allow_principals = [
-    { principal = "*" }, { principal = "arn:aws:iam::093584080162:user/*" }
+    { principal = "arn:aws:iam::123456789012:user/relyt-consumer" }
   ]
+}
+
+# On Alibaba Cloud the endpoint service keeps an account whitelist: a principal
+# is the consumer's main account UID, digits only.
+resource "relyt_dwsu_privatelink" "privatelink_alicloud" {
+  dwsu_id      = "dwsu-id-from-an-duws-resource"
+  service_type = "database"
+  allow_principals = [
+    { principal = "1234567890123456" }
+  ]
+}
+
+# The consumer creates the endpoint on their side, and Alibaba Cloud only
+# allows it in a zone the endpoint service has a backend in - which is what
+# zones reports.
+resource "alicloud_privatelink_vpc_endpoint" "endpoint" {
+  service_name = relyt_dwsu_privatelink.privatelink_alicloud.service_name
+  vpc_id       = var.vpc_id
+
+  zone {
+    zone_id    = relyt_dwsu_privatelink.privatelink_alicloud.zones[0]
+    vswitch_id = var.vswitch_id
+  }
 }
 ```
 
@@ -35,13 +59,14 @@ resource "relyt_dwsu_privatelink" "privatelink" {
 
 - `service_name` (String)
 - `status` (String)
+- `zones` (List of String) The availability zones the endpoint service has backends in. On Alibaba Cloud the consumer endpoint can only be created in one of these zones, so this is what feeds zone_id of alicloud_privatelink_vpc_endpoint. Empty where the deployment does not report zones.
 
 <a id="nestedatt--allow_principals"></a>
 ### Nested Schema for `allow_principals`
 
 Required:
 
-- `principal` (String) principal
+- `principal` (String) Who may connect to the endpoint service. On AWS an IAM principal ARN, or * for everyone. On Alibaba Cloud the account whitelist takes the consumer's main account UID, digits only.
 
 ## Import
 

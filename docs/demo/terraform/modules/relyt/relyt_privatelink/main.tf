@@ -10,6 +10,8 @@ provider "relyt" {
   role     = "SYSTEMADMIN"
 }
 
+# "*" is an AWS value. On Alibaba Cloud a principal is the consumer's main
+# account UID, digits only.
 resource "relyt_dwsu_privatelink" "pl_api" {
   dwsu_id      = var.dwsu_id
   service_type = "data_api"
