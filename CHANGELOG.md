@@ -1,4 +1,4 @@
-## 1.7.0 (Unreleased)
+## 1.7.0 (October 21, 2026)
 
 FEATURES:
 
